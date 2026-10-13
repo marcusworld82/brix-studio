@@ -2,6 +2,13 @@
 // client bundle. Runs after `next build` (see package.json "build").
 import { readdirSync, readFileSync, statSync, existsSync } from "node:fs"
 import { join } from "node:path"
+import { createRequire } from "node:module"
+
+// The build child process does not export loaded .env values to this process.
+// Load the same environment before comparing exact server-secret values.
+const require = createRequire(import.meta.url)
+const requireFromNext = createRequire(require.resolve("next/package.json"))
+requireFromNext("@next/env").loadEnvConfig(process.cwd(), false)
 
 const STATIC = join(process.cwd(), ".next", "static")
 if (!existsSync(STATIC)) {
@@ -13,8 +20,9 @@ const PATTERNS = [
   /sk_(live|test)_[0-9a-zA-Z]{10,}/, // Stripe secret keys
   /whsec_[0-9a-zA-Z]{10,}/, // Stripe webhook secrets
   /rk_(live|test)_[0-9a-zA-Z]{10,}/, // Stripe restricted keys
-  /re_[0-9a-zA-Z]{8,}_[0-9a-zA-Z]{10,}/, // Resend keys
+  /re_[0-9a-zA-Z_-]{20,}/, // Resend keys
   /mongodb(\+srv)?:\/\/[^"'\s]*@/, // Mongo URIs with credentials
+  /sb_secret_[0-9a-zA-Z_-]{12,}/, // Supabase server secret keys
 ]
 // Exact values of server env vars, when set in this build's environment.
 const SECRET_ENV = [
@@ -28,6 +36,8 @@ const SECRET_ENV = [
   "R2_SECRET_ACCESS_KEY",
   "CRON_SECRET",
   "MONGODB_URI",
+  "SUPABASE_SECRET_KEY",
+  "API_KEY_ENCRYPTION_SECRET",
 ]
 const values = SECRET_ENV.map((name) => [name, process.env[name]]).filter(
   ([, value]) => value && value.length >= 8 && value !== "key_id:key_secret"
