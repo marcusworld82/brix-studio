@@ -1,6 +1,8 @@
 import "server-only"
 
 import { collections } from "@/lib/db/collections"
+import { isSupabaseBackend } from "@/lib/backend"
+import { createSupabaseServiceClient } from "@/lib/supabase/server"
 
 /**
  * Fixed-window rate limiter on a Mongo TTL collection (no Redis needed).
@@ -28,6 +30,18 @@ export async function rateLimit(
   const windowMs = windowSeconds * 1000
   const start = Math.floor(Date.now() / windowMs) * windowMs
   const resetAt = new Date(start + windowMs)
+  if (isSupabaseBackend()) {
+    const { data, error } = await createSupabaseServiceClient().rpc(
+      "brix_rate_limit",
+      {
+        target_key: `${key}:${start}`,
+        request_limit: limit,
+        period_seconds: windowSeconds,
+      }
+    )
+    if (error) throw new Error("Rate-limit service is unavailable.")
+    return { ok: data === true, remaining: 0, resetAt }
+  }
   const { rateLimits } = await collections()
   const doc = await rateLimits.findOneAndUpdate(
     { _id: `${key}:${start}` },

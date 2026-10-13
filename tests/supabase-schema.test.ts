@@ -44,6 +44,17 @@ beforeAll(async () => {
     "utf8"
   )
   await database.exec(migration)
+  for (const name of [
+    "202610130002_runtime.sql",
+    "202610130003_admin_catalog.sql",
+  ]) {
+    await database.exec(
+      await readFile(
+        new URL(`../supabase/migrations/${name}`, import.meta.url),
+        "utf8"
+      )
+    )
+  }
   await database.query("insert into auth.users(id) values ($1), ($2)", [
     owner,
     other,
@@ -143,10 +154,11 @@ describe("Supabase BRIX migration and access boundaries", () => {
       ).rows
     ).toEqual([])
     await database.exec("reset role")
-    await asUser(owner)
+    await database.exec("set role service_role")
     const status = (
       await database.query<{ key_label: string; created_at: Date }>(
-        "select * from public.brix_connection_status()"
+        "select * from public.brix_user_connection_status($1)",
+        [owner]
       )
     ).rows[0]!
     expect(Object.keys(status).sort()).toEqual(["created_at", "key_label"])

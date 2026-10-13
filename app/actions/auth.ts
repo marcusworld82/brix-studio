@@ -1,6 +1,10 @@
 "use server"
 
 import { headers } from "next/headers"
+import { redirect } from "next/navigation"
+import { isSupabaseBackend } from "@/lib/backend"
+import { requestSupabaseLogin } from "@/lib/supabase/auth"
+import { createSupabaseSessionClient } from "@/lib/supabase/server"
 import { z } from "zod"
 
 import { signIn, signOut } from "@/auth"
@@ -62,6 +66,8 @@ export async function requestMagicLinkAction(input: {
         "Too many sign-in attempts from this network. Try again later.",
         "RATE_LIMITED"
       )
+    if (isSupabaseBackend())
+      return requestSupabaseLogin(email, parsed.callbackUrl)
     const result: unknown = await signIn("resend", {
       email,
       redirectTo: safeCallback(parsed.callbackUrl),
@@ -77,5 +83,9 @@ export async function requestMagicLinkAction(input: {
 }
 
 export async function signOutAction(): Promise<void> {
+  if (isSupabaseBackend()) {
+    await (await createSupabaseSessionClient()).auth.signOut()
+    redirect("/")
+  }
   await signOut({ redirectTo: "/" })
 }

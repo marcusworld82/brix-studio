@@ -42,7 +42,9 @@ const COLUMNS: { title: string; links: { label: string; href: string }[] }[] = [
     links: [
       { label: "Pricing", href: "/pricing" },
       { label: "Templates", href: "/templates" },
-      { label: "Support", href: `mailto:${BRAND.supportEmail}` },
+      ...(BRAND.supportEmail
+        ? [{ label: "Support", href: `mailto:${BRAND.supportEmail}` }]
+        : []),
       { label: "Terms", href: "/legal/terms" },
       { label: "Privacy", href: "/legal/privacy" },
     ],
@@ -65,9 +67,7 @@ export function Footer() {
           <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
             {COLUMNS.map((column) => (
               <div key={column.title} className="flex flex-col gap-3">
-                <p className="text-sm font-medium text-white">
-                  {column.title}
-                </p>
+                <p className="text-sm font-medium text-white">{column.title}</p>
                 {column.links.map((link) => (
                   <Link
                     key={link.label}

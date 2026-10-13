@@ -1,6 +1,6 @@
 # BRIX: user-owned Higgsfield API access
 
-Confirmed product requirement, 2026-10-13. This describes the requested architecture, not completed implementation.
+Confirmed product requirement, 2026-10-13. Runtime implementation uses Supabase. Deployment and verification status are reported separately.
 
 ## Supabase decision
 
@@ -8,12 +8,11 @@ Marcus selected Supabase for the database and media storage and requested a new
 BRIX project in the LAZY MONEY WORLD organization. Do not use or modify the
 existing project named kingcollins82@gmail.com's Project.
 
-The migration in `supabase/migrations/202610130001_brix_byok.sql` and connection
-helpers in `lib/supabase/` are prepared but not activated. The app still uses
-its legacy backend. Supabase project creation is awaiting dashboard sign-in;
-the connector's advertised project cost check is unavailable. Do not claim a
-completed migration or public deployment until the real project is configured,
-the app's auth and data paths are migrated, and end-to-end checks pass.
+The dedicated BRIX project is vvjybkwkzjwinoynbcqq. Three migrations are applied.
+APP_BACKEND=supabase activates Supabase Auth, Postgres, private Storage, encrypted
+per-user Higgsfield connections, generation lifecycle, and editable effects/templates.
+The legacy backend remains available only with APP_BACKEND=legacy.
+Hosted authentication, storage, and privacy checks must pass before public deployment.
 
 ## User flow
 

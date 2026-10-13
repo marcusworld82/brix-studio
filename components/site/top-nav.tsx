@@ -92,7 +92,7 @@ export function TopNav({ compact = false }: { compact?: boolean }) {
 }
 
 function AccountControls({ compact }: { compact: boolean }) {
-  const { user, credits, openAuth, openUpgrade } = useApp()
+  const { user, credits, openAuth, openUpgrade, pricing } = useApp()
   const height = compact ? "h-8" : "h-9"
   if (!user)
     return (
@@ -117,6 +117,26 @@ function AccountControls({ compact }: { compact: boolean }) {
         >
           Sign up
         </button>
+      </>
+    )
+  if (pricing.mode === "api-key")
+    return (
+      <>
+        <Link
+          href="/account"
+          className={cn(
+            "rounded-[10px] bg-white/5 px-3 text-sm leading-8 font-medium",
+            height
+          )}
+        >
+          {user.apiKeyConnected ? "API key saved" : "Connect API key"}
+        </Link>
+        <UserMenu />
+        {user.role === "admin" ? (
+          <Link href="/admin" className="hidden text-sm font-medium sm:block">
+            Admin
+          </Link>
+        ) : null}
       </>
     )
   return (
@@ -159,7 +179,7 @@ function AccountControls({ compact }: { compact: boolean }) {
 }
 
 function UserMenu() {
-  const { user } = useApp()
+  const { user, pricing } = useApp()
   if (!user) return null
   const initial = (user.name || user.email).slice(0, 1).toUpperCase()
   return (
@@ -186,9 +206,11 @@ function UserMenu() {
         <DropdownMenuItem render={<Link href="/account" />}>
           <UserRound /> Account
         </DropdownMenuItem>
-        <DropdownMenuItem render={<Link href="/account/billing" />}>
-          <CreditCard /> Billing
-        </DropdownMenuItem>
+        {pricing.mode !== "api-key" ? (
+          <DropdownMenuItem render={<Link href="/account/billing" />}>
+            <CreditCard /> Billing
+          </DropdownMenuItem>
+        ) : null}
         {user.role === "admin" ? (
           <DropdownMenuItem render={<Link href="/admin" />}>
             <Shield /> Admin
@@ -212,7 +234,7 @@ function MobileSheet({
   onOpenChange: (open: boolean) => void
   pathname: string
 }) {
-  const { user, openAuth, openUpgrade } = useApp()
+  const { user, openAuth, openUpgrade, pricing } = useApp()
   const close = () => onOpenChange(false)
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
@@ -277,7 +299,15 @@ function MobileSheet({
             ) : null}
           </nav>
           <div className="mt-auto flex flex-col gap-2">
-            {user ? (
+            {user && pricing.mode === "api-key" ? (
+              <Link
+                href="/account"
+                onClick={close}
+                className="btn-keycap flex h-12 items-center justify-center rounded-xl font-semibold"
+              >
+                API connection
+              </Link>
+            ) : user ? (
               <button
                 type="button"
                 className="btn-keycap h-12 rounded-xl text-base font-semibold"

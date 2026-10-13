@@ -25,8 +25,11 @@ async function signedInUser() {
 
 /** A masked status only. Raw credentials never enter a client response. */
 export async function connectionStatus() {
-  const { client } = await signedInUser()
-  const { data, error } = await client.rpc("brix_connection_status")
+  const { user } = await signedInUser()
+  const { data, error } = await createSupabaseServiceClient().rpc(
+    "brix_user_connection_status",
+    { target_user_id: user.id }
+  )
   if (error) throw new UserFacingError("Couldn't load your API connection.")
   const row = data?.[0]
   return row
@@ -83,7 +86,7 @@ export async function clientForConnection(
     "brix_get_connection",
     {
       target_user_id: userId,
-      target_connection_id: connectionId ?? null,
+      ...(connectionId ? { target_connection_id: connectionId } : {}),
     }
   )
   if (error)

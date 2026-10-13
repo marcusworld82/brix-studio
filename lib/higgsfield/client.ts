@@ -248,6 +248,8 @@ let shared: HiggsfieldClient | undefined
 
 /** The platform client configured from env; throws when unconfigured. */
 export function higgsfield(): HiggsfieldClient {
+  if (process.env.APP_BACKEND === "supabase")
+    throw new PlatformNotConfiguredError()
   if (shared) return shared
   const value = env()
   if (!value.HF_CREDENTIALS) throw new PlatformNotConfiguredError()

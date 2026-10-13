@@ -28,6 +28,7 @@ function contentSecurityPolicy(): string {
     "data:",
     "blob:",
     origin(process.env.R2_PUBLIC_BASE_URL),
+    origin(process.env.NEXT_PUBLIC_SUPABASE_URL),
     "https://*.higgsfield.ai",
     "https://*.cloudfront.net",
     ...(isDev ? ["http://localhost:4010"] : []),

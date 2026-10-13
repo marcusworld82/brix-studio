@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto"
 
 import { collections } from "@/lib/db/collections"
+import { isSupabaseBackend } from "@/lib/backend"
 import { env } from "@/lib/env"
 import { json } from "@/lib/http"
 
@@ -24,7 +25,8 @@ function allowed(request: Request): boolean {
 }
 
 export async function GET(request: Request) {
-  if (!allowed(request)) return json({ error: "Not found" }, 404)
+  if (isSupabaseBackend() || !allowed(request))
+    return json({ error: "Not found" }, 404)
   const to = new URL(request.url).searchParams.get("to")?.toLowerCase()
   if (!to) return json({ error: "Missing ?to=" }, 400)
   const { devMailbox } = await collections()

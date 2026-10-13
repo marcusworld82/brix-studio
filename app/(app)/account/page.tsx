@@ -6,12 +6,39 @@ import { CreditCard, Sparkle } from "lucide-react"
 import { LedgerTable } from "@/components/account/ledger-table"
 import { getAccount, listLedger } from "@/lib/account"
 import { currentUser } from "@/lib/auth/session"
+import { isSupabaseBackend } from "@/lib/backend"
+import { connectionStatus } from "@/lib/supabase/connections"
+import { safeReturnPath } from "@/lib/supabase/auth"
+import { ApiKeyForm } from "@/components/account/api-key-form"
 
 export const metadata: Metadata = { title: "Account" }
 
-export default async function AccountPage() {
+export default async function AccountPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string }>
+}) {
   const user = await currentUser()
   if (!user) redirect("/login?callbackUrl=/account")
+  if (isSupabaseBackend()) {
+    const status = await connectionStatus()
+    return (
+      <div className="flex flex-col gap-6">
+        <header>
+          <h1 className="font-display text-4xl">Account</h1>
+          <p className="mt-2 text-muted-foreground">{user.email}</p>
+        </header>
+        <ApiKeyForm
+          label={status.connected ? status.label : undefined}
+          next={safeReturnPath((await searchParams).next)}
+        />
+        <p className="text-sm text-muted-foreground">
+          BRIX does not debit studio generation credits in this setup.
+          Higgsfield bills your API account.
+        </p>
+      </div>
+    )
+  }
   const [account, ledger] = await Promise.all([
     getAccount(user.objectId),
     listLedger(user.objectId),

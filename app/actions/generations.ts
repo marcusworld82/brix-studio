@@ -3,6 +3,19 @@
 import { revalidatePath } from "next/cache"
 
 import { runAction } from "@/lib/action-result"
+import { isSupabaseBackend } from "@/lib/backend"
+import { UserFacingError } from "@/lib/errors"
+import {
+  submitUserGeneration,
+  cancelUserGeneration,
+  finalizeUserGeneration,
+} from "@/lib/supabase/generations"
+import {
+  ownGeneration,
+  generationView,
+  removeGenerations,
+  moveGenerations,
+} from "@/lib/supabase/library"
 import type { ActionResult } from "@/lib/action-types"
 import { objectIdOrNotFound, requireUser } from "@/lib/auth/session"
 import { cancelGeneration } from "@/lib/generations/cancel"
@@ -22,7 +35,12 @@ import { enforceRateLimit } from "@/lib/rate-limit"
 export async function submitGenerationAction(
   input: SubmitInput
 ): Promise<ActionResult<GenerationView>> {
-  return runAction(async () => submitGeneration(await requireUser(), input))
+  return runAction(async () => {
+    const user = await requireUser()
+    return isSupabaseBackend()
+      ? submitUserGeneration(user.id, input)
+      : submitGeneration(user, input)
+  })
 }
 
 export async function cancelGenerationAction(
@@ -30,6 +48,7 @@ export async function cancelGenerationAction(
 ): Promise<ActionResult<GenerationView>> {
   return runAction(async () => {
     const user = await requireUser()
+    if (isSupabaseBackend()) return cancelUserGeneration(user.id, id)
     await cancelGeneration(user.objectId, objectIdOrNotFound(id))
     return toGenerationView(await getOwnGeneration(user.objectId, id))
   })
@@ -42,6 +61,11 @@ export async function refreshGenerationAction(
   return runAction(async () => {
     const user = await requireUser()
     await enforceRateLimit(`refresh:${user.id}`, 30, 60)
+    if (isSupabaseBackend()) {
+      const row = await ownGeneration(user.id, id)
+      await finalizeUserGeneration(row.id)
+      return generationView(await ownGeneration(user.id, id))
+    }
     const doc = await getOwnGeneration(user.objectId, id)
     if (IN_FLIGHT.includes(doc.status)) await finalizeGeneration(doc._id)
     return toGenerationView(await getOwnGeneration(user.objectId, id))
@@ -53,7 +77,9 @@ export async function deleteGenerationsAction(
 ): Promise<ActionResult<{ deleted: number }>> {
   return runAction(async () => {
     const user = await requireUser()
-    const result = await deleteGenerations(user.objectId, ids.slice(0, 200))
+    const result = isSupabaseBackend()
+      ? await removeGenerations(user.id, ids)
+      : await deleteGenerations(user.objectId, ids.slice(0, 200))
     revalidatePath("/assets")
     return result
   })
@@ -65,8 +91,12 @@ export async function publishGenerationAction(
 ): Promise<ActionResult<GenerationView>> {
   return runAction(async () => {
     const user = await requireUser()
+    if (isSupabaseBackend())
+      throw new UserFacingError(
+        "Public publishing is not enabled on this studio."
+      )
     const view = await setPublished(user.objectId, id, isPublic)
-        return view
+    return view
   })
 }
 
@@ -74,7 +104,10 @@ export async function moveToProjectAction(
   ids: string[],
   projectId: string | null
 ): Promise<ActionResult<{ moved: number }>> {
-  return runAction(async () =>
-    moveToProject((await requireUser()).objectId, ids.slice(0, 200), projectId)
-  )
+  return runAction(async () => {
+    const user = await requireUser()
+    return isSupabaseBackend()
+      ? moveGenerations(user.id, ids, projectId)
+      : moveToProject(user.objectId, ids.slice(0, 200), projectId)
+  })
 }

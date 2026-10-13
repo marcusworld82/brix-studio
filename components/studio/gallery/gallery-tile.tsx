@@ -280,6 +280,14 @@ function GalleryTileComponent({
       onMouseLeave={item.kind === "video" ? () => setHovered(false) : undefined}
     >
       {media}
+      {item.generation?.errorKind === "storage" ? (
+        <p
+          role="status"
+          className="absolute inset-x-2 top-2 z-[4] rounded bg-amber-950/95 p-2 text-xs text-amber-100"
+        >
+          {item.generation.error}
+        </p>
+      ) : null}
       <GenerationDetailModal
         generation={{
           src,
@@ -289,7 +297,8 @@ function GalleryTileComponent({
           model: item.modelLabel,
           createdAt: item.createdAt,
           settings: item.settings,
-          ...(item.generation
+          ...(item.generation &&
+          item.generation.billingSource !== "higgsfield-api"
             ? { cost: item.generation.cost - item.generation.refunded }
             : {}),
         }}

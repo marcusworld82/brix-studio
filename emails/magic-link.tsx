@@ -30,14 +30,19 @@ export function MagicLinkEmail({
       footer={
         <>
           You received this because someone asked to sign in to {host} with this
-          address. If that wasn&apos;t you, ignore this email — nothing happens
-          until the link is clicked. Questions:{" "}
-          <Link
-            href={`mailto:${supportEmail}`}
-            style={{ color: EMAIL_COLORS.muted }}
-          >
-            {supportEmail}
-          </Link>
+          address. If that wasn&apos;t you, ignore this email. Nothing happens
+          until the link is clicked.{" "}
+          {supportEmail ? (
+            <>
+              Questions:{" "}
+              <Link
+                href={`mailto:${supportEmail}`}
+                style={{ color: EMAIL_COLORS.muted }}
+              >
+                {supportEmail}
+              </Link>
+            </>
+          ) : null}
         </>
       }
     >

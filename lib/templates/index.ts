@@ -6,6 +6,12 @@ import { z } from "zod"
 import { findModel } from "@/generation/catalog"
 import type { Surface } from "@/generation/catalog/types"
 import { collections, type TemplateDoc } from "@/lib/db/collections"
+import { isSupabaseBackend } from "@/lib/backend"
+import {
+  listSupabaseTemplates,
+  writeSupabaseTemplate,
+  removeSupabaseTemplate,
+} from "@/lib/supabase/templates"
 import { NotFoundError, UserFacingError } from "@/lib/errors"
 import { enforceRateLimit, LIMITS } from "@/lib/rate-limit"
 import type { SessionUser } from "@/lib/auth/session"
@@ -52,6 +58,8 @@ function toView(doc: TemplateDoc): TemplateView {
 export async function listOfficialTemplates(
   options: { includeInactive?: boolean } = {}
 ): Promise<TemplateView[]> {
+  if (isSupabaseBackend())
+    return listSupabaseTemplates(null, options.includeInactive)
   const { templates } = await collections()
   const docs = await templates
     .find({
@@ -65,8 +73,9 @@ export async function listOfficialTemplates(
 
 /** Templates this user saved, newest first. Never returns anyone else's. */
 export async function listMyTemplates(
-  user: Pick<SessionUser, "objectId">
+  user: Pick<SessionUser, "objectId" | "id">
 ): Promise<TemplateView[]> {
+  if (isSupabaseBackend()) return listSupabaseTemplates(user.id)
   const { templates } = await collections()
   const docs = await templates
     .find({ ownerId: user.objectId })
@@ -123,6 +132,7 @@ export async function createUserTemplate(
     LIMITS.templatePerUser.window,
     "You're saving templates quickly. Try again in a bit."
   )
+  if (isSupabaseBackend()) return writeSupabaseTemplate(user.id, input)
   const { templates } = await collections()
   if (
     (await templates.countDocuments({ ownerId: user.objectId })) >=
@@ -151,6 +161,7 @@ export async function deleteUserTemplate(
   user: SessionUser,
   id: string
 ): Promise<void> {
+  if (isSupabaseBackend()) return removeSupabaseTemplate(user.id, id)
   if (!ObjectId.isValid(id)) throw new NotFoundError("Template not found.")
   const { templates } = await collections()
   const result = await templates.deleteOne({
@@ -168,6 +179,7 @@ export async function upsertOfficialTemplate(
   assertSurface(input)
   assertCover(input.coverUrl)
   assertCover(input.coverVideoUrl)
+  if (isSupabaseBackend()) return writeSupabaseTemplate(null, input, id)
   const { templates } = await collections()
   const now = new Date()
   const fields = {
@@ -208,6 +220,7 @@ export async function upsertOfficialTemplate(
 }
 
 export async function deleteOfficialTemplate(id: string): Promise<void> {
+  if (isSupabaseBackend()) return removeSupabaseTemplate(null, id)
   if (!ObjectId.isValid(id)) throw new NotFoundError("Template not found.")
   const { templates } = await collections()
   await templates.deleteOne({ _id: new ObjectId(id), ownerId: null })

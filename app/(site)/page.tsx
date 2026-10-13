@@ -16,15 +16,13 @@ import { EmptyCard } from "@/components/marketing/empty-card"
 import { Masonry, MasonryItem } from "@/components/marketing/masonry"
 import { EffectTile, TileMedia } from "@/components/marketing/media-tile"
 import { ScrollRow } from "@/components/marketing/scroll-row"
-import {
-  FadeClamp,
-  SectionHeader,
-} from "@/components/marketing/section-header"
+import { FadeClamp, SectionHeader } from "@/components/marketing/section-header"
 import { LoopVideo } from "@/components/media/loop-video"
 import { findModel, MODELS } from "@/generation/catalog"
 import type { ModelEntry } from "@/generation/catalog/types"
 import { FAMILY_LOOPS, familyCover, HERO } from "@/lib/showcase"
 import { listOfficialTemplates } from "@/lib/templates"
+import { isSupabaseBackend } from "@/lib/backend"
 
 /** Top-of-page tool cards (§3.2): the models we lead with. */
 const TOOL_IDS = [
@@ -112,9 +110,15 @@ export default async function ExplorePage() {
             <span className="text-lime">Skip the set.</span>
           </h1>
           <p className="max-w-[560px] text-base text-white/80 [text-shadow:0_1px_14px_rgba(0,0,0,0.7)] md:text-lg">
-            Turn a sentence or a single frame into cinematic video and images.
-            Seedance, Kling, Soul and dozens more models share one credit
-            balance and one library.
+            {isSupabaseBackend() ? (
+              "Create images and video with your own Higgsfield API key. Generations use your API balance."
+            ) : (
+              <>
+                Turn a sentence or a single frame into cinematic video and
+                images. Seedance, Kling, Soul and dozens more models share one
+                credit balance and one library.
+              </>
+            )}
           </p>
           <div className="flex w-full flex-col items-center justify-center gap-3 sm:w-auto sm:flex-row">
             <Link

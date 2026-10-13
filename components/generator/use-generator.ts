@@ -213,15 +213,17 @@ export function useGenerator(surface: Surface, presets: PresetView[] = []) {
 
   const quote = useMemo(
     () =>
-      model
+      model && pricing.mode !== "api-key"
         ? tryPriceFor(model.id, settings, media, pricing.table, finalPrompt)
         : null,
-    [finalPrompt, media, model, pricing.table, settings]
+    [finalPrompt, media, model, pricing.table, pricing.mode, settings]
   )
 
   const hasInput = finalPrompt.trim().length > 0 || media.length > 0
   // The endpoint these settings reach has no price (yet) on this deployment.
-  const unpriced = Boolean(validation.path && !pricing.table[validation.path])
+  const unpriced =
+    pricing.mode !== "api-key" &&
+    Boolean(validation.path && !pricing.table[validation.path])
   const disabledReason = !hasInput
     ? model?.requirePrompt ||
       !model?.roles ||
@@ -247,6 +249,13 @@ export function useGenerator(surface: Surface, presets: PresetView[] = []) {
       return
     }
     setSubmitting(true)
+    if (pricing.mode === "api-key" && !user.apiKeyConnected) {
+      setSubmitting(false)
+      router.push(
+        `/account?next=${encodeURIComponent(`${pathname}?${params.toString()}`)}`
+      )
+      return
+    }
     setError(null)
     const result = await runs.submit({
       submitKey: newKey(),
@@ -286,6 +295,10 @@ export function useGenerator(surface: Surface, presets: PresetView[] = []) {
     settings,
     toast,
     user,
+    pricing.mode,
+    router,
+    pathname,
+    params,
     validation.plane,
   ])
 

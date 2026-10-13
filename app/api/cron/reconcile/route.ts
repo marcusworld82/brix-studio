@@ -3,6 +3,8 @@ import { timingSafeEqual } from "node:crypto"
 import { env } from "@/lib/env"
 import { reconcile } from "@/lib/generations/reconcile"
 import { json } from "@/lib/http"
+import { isSupabaseBackend } from "@/lib/backend"
+import { reconcileUserGenerations } from "@/lib/supabase/generations"
 
 export const runtime = "nodejs"
 export const maxDuration = 60
@@ -18,7 +20,9 @@ function authorized(request: Request): boolean {
 /** Vercel Cron (every minute) sends `Authorization: Bearer $CRON_SECRET`. */
 export async function GET(request: Request) {
   if (!authorized(request)) return json({ error: "Unauthorized" }, 401)
-  return json(await reconcile())
+  return json(
+    await (isSupabaseBackend() ? reconcileUserGenerations() : reconcile())
+  )
 }
 
 export const POST = GET

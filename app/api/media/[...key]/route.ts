@@ -3,6 +3,9 @@ import { stat } from "node:fs/promises"
 import { Readable } from "node:stream"
 
 import { localPathFor, storageDriver } from "@/lib/storage"
+import { isSupabaseBackend } from "@/lib/backend"
+import { currentUser } from "@/lib/auth/session"
+import { signedMediaUrl } from "@/lib/supabase/media"
 
 export const runtime = "nodejs"
 
@@ -27,6 +30,18 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ key: string[] }> }
 ) {
+  if (isSupabaseBackend()) {
+    const user = await currentUser()
+    if (!user) return new Response("Not found", { status: 404 })
+    try {
+      return Response.redirect(
+        await signedMediaUrl((await params).key.join("/"), user.id),
+        307
+      )
+    } catch {
+      return new Response("Not found", { status: 404 })
+    }
+  }
   if (storageDriver() === "r2")
     return new Response("Not found", { status: 404 })
   const { key } = await params

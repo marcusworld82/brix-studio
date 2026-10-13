@@ -22,15 +22,26 @@ const optionalString = z
   .transform((value) => (value && value.trim() ? value.trim() : undefined))
 
 const schema = z.object({
+  APP_BACKEND: z.enum(["legacy", "supabase"]).default("legacy"),
+  NEXT_PUBLIC_SUPABASE_URL: optionalString,
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: optionalString,
+  SUPABASE_SECRET_KEY: optionalString,
+  API_KEY_ENCRYPTION_SECRET: optionalString,
   NODE_ENV: z
     .enum(["development", "test", "production"])
     .default("development"),
-  APP_URL: z.url().default("http://localhost:3000"),
+  APP_URL: z
+    .url()
+    .default(
+      process.env.VERCEL_PROJECT_PRODUCTION_URL
+        ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+        : "http://localhost:3000"
+    ),
 
   AUTH_SECRET: optionalString,
   AUTH_RESEND_KEY: optionalString,
   EMAIL_FROM: z.string().default("BRIX <login@vireo.studio>"),
-  SUPPORT_EMAIL: z.email().default("support@vireo.studio"),
+  SUPPORT_EMAIL: z.union([z.email(), z.literal("")]).default(""),
   SIGNUP_BONUS_CREDITS: z.coerce.number().int().min(0).default(0),
   /** Comma-separated emails that get the admin role. */
   ADMIN_EMAILS: z
@@ -118,7 +129,19 @@ export function env(): Env {
   }
   const value = parsed.data
   if (value.NODE_ENV === "production" && !isBuildPhase()) {
-    const missing = REQUIRED_IN_PRODUCTION.filter((key) => !value[key])
+    const required =
+      value.APP_BACKEND === "supabase"
+        ? ([
+            "AUTH_RESEND_KEY",
+            "NEXT_PUBLIC_SUPABASE_URL",
+            "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+            "SUPABASE_SECRET_KEY",
+            "API_KEY_ENCRYPTION_SECRET",
+            "HF_WEBHOOK_SECRET",
+            "CRON_SECRET",
+          ] as const)
+        : REQUIRED_IN_PRODUCTION
+    const missing = required.filter((key) => !value[key])
     if (missing.length)
       throw new EnvError(
         `Missing required production environment variables:\n${missing
@@ -126,7 +149,11 @@ export function env(): Env {
           .join("\n")}\nSee .env.example for what each one does.`
       )
   }
-  if (value.NODE_ENV !== "production" && !warned) {
+  if (
+    value.NODE_ENV !== "production" &&
+    value.APP_BACKEND === "legacy" &&
+    !warned
+  ) {
     warned = true
     const fallbacks = [
       !value.MONGODB_URI &&

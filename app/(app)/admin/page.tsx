@@ -17,6 +17,8 @@ import {
   moderationQueue,
   searchUsers,
 } from "@/lib/admin"
+import { isSupabaseBackend } from "@/lib/backend"
+import { SupabaseAdmin } from "@/components/admin/supabase-admin"
 import { currentUser } from "@/lib/auth/session"
 import { pricingContext } from "@/lib/billing/pricing"
 import { listPresets } from "@/lib/presets"
@@ -46,6 +48,7 @@ export default async function AdminPage({
   // Not an admin → the page simply doesn't exist.
   if (user?.role !== "admin") notFound()
   const params = await searchParams
+  if (isSupabaseBackend()) return <SupabaseAdmin params={params} />
   const tab: Tab = TABS.some((t) => t.id === params.tab)
     ? (params.tab as Tab)
     : "users"

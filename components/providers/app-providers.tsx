@@ -18,6 +18,7 @@ import { Toaster, useToast } from "./toaster"
 /* ── Session ───────────────────────────────────────────────────────────── */
 
 export type ClientUser = {
+  apiKeyConnected?: boolean
   id: string
   role: "user" | "admin"
   email: string

@@ -7,6 +7,7 @@ import { Resend } from "resend"
 import { collections } from "@/lib/db/collections"
 import { env } from "@/lib/env"
 import { UserFacingError } from "@/lib/errors"
+import { isSupabaseBackend } from "@/lib/backend"
 
 /**
  * Transactional email through Resend. Real sign-in addresses require a service
@@ -49,6 +50,7 @@ export async function sendEmail(input: {
   if (input.devUrl) requireEmailDelivery(input.to)
   // E2E runs (local or a preview deploy) read magic links from the test mailbox.
   const capture =
+    !isSupabaseBackend() &&
     Boolean(input.devUrl) &&
     ((value.E2E_TEST_MODE && process.env.VERCEL_ENV !== "production") ||
       (!value.AUTH_RESEND_KEY && value.NODE_ENV !== "production"))

@@ -8,6 +8,7 @@ import { TopupGrid } from "@/components/billing/plan-cards"
 import { getAccount } from "@/lib/account"
 import { currentUser } from "@/lib/auth/session"
 import { PLANS } from "@/lib/billing/plans"
+import { isSupabaseBackend } from "@/lib/backend"
 
 export const metadata: Metadata = { title: "Billing" }
 
@@ -16,6 +17,7 @@ export default async function BillingPage({
 }: {
   searchParams: Promise<{ checkout?: string }>
 }) {
+  if (isSupabaseBackend()) redirect("/account")
   const user = await currentUser()
   if (!user) redirect("/login?callbackUrl=/account/billing")
   const [account, { checkout }] = await Promise.all([

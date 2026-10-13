@@ -1,3 +1,15 @@
+# Current BRIX backend
+
+APP_BACKEND=supabase uses Supabase Auth, Postgres, private Storage, and each user's
+encrypted Higgsfield API connection. Never fall back to the owner's shared key.
+Use lib/supabase for lifecycle and storage, verified user.id for ownership, and
+server-only service RPCs for privileged writes. Do not call user.objectId or the
+legacy MongoDB, Stripe, BRIX credit ledger, or shared higgsfield() in this mode.
+Every private action must still requireUser and scope by the verified user ID.
+Effect/template admin writes requireAdmin. Never send API secrets to a client.
+
+The original contract below applies to APP_BACKEND=legacy. Preserve that mode.
+
 # BRIX — contract for coding agents
 
 BRIX is a credit-metered AI image/video studio on the Higgsfield REST API,

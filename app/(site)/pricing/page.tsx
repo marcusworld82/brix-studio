@@ -7,10 +7,13 @@ import { Atmosphere } from "@/components/marketing/atmosphere"
 import { PricingView } from "@/components/marketing/pricing-view"
 import { BRAND } from "@/lib/brand"
 import { PLANS } from "@/lib/billing/plans"
+import { isSupabaseBackend } from "@/lib/backend"
 
 export const metadata: Metadata = {
   title: "Pricing",
-  description: `Plans and credit top-ups for ${BRAND.name}. Every plan unlocks every image and video model.`,
+  description: isSupabaseBackend()
+    ? "Use your own Higgsfield API key and API balance in BRIX."
+    : `Plans and credit top-ups for ${BRAND.name}. Every plan unlocks every image and video model.`,
 }
 
 const plus = PLANS.plus
@@ -113,6 +116,27 @@ const FAQ: { q: string; a: ReactNode }[] = [
 ]
 
 export default function PricingPage() {
+  if (isSupabaseBackend())
+    return (
+      <div className="studio-backdrop mx-auto flex max-w-4xl flex-col gap-6 px-6 py-16">
+        <h1 className="font-display text-5xl">Your key. Your API balance.</h1>
+        <p className="text-lg text-muted-foreground">
+          Sign in with email, connect your Higgsfield API key, then create
+          images and videos from this studio.
+        </p>
+        <p>
+          Higgsfield charges your API account for generation. BRIX does not
+          debit studio generation credits in this setup. A Higgsfield
+          subscription login is not needed.
+        </p>
+        <Link
+          href="/account"
+          className="btn-keycap flex h-12 w-fit items-center rounded-xl px-6 font-semibold"
+        >
+          Connect your API key
+        </Link>
+      </div>
+    )
   return (
     <div className="relative isolate">
       <Atmosphere glow="top" className="-z-10 h-[520px]" />

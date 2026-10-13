@@ -18,7 +18,12 @@ export function verifyWebhookToken(
   token: string,
   secret: string
 ): boolean {
-  if (!/^[a-f0-9]{24}$/.test(generationId) || !/^[a-f0-9]{64}$/.test(token))
+  if (
+    !/^(?:[a-f0-9]{24}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})$/i.test(
+      generationId
+    ) ||
+    !/^[a-f0-9]{64}$/.test(token)
+  )
     return false
   const expected = Buffer.from(webhookToken(generationId, secret), "hex")
   const given = Buffer.from(token, "hex")
@@ -27,7 +32,13 @@ export function verifyWebhookToken(
 
 /** Full hf_webhook URL for a generation, or undefined when webhooks are off. */
 export function webhookUrlFor(generationId: string): string | undefined {
-  const { HF_WEBHOOK_BASE_URL: base, HF_WEBHOOK_SECRET: secret } = env()
+  const value = env()
+  const secret = value.HF_WEBHOOK_SECRET
+  const base =
+    value.HF_WEBHOOK_BASE_URL ??
+    (value.APP_BACKEND === "supabase" && value.NODE_ENV === "production"
+      ? value.APP_URL
+      : undefined)
   if (!base || !secret) return undefined
   const url = new URL("/api/webhooks/higgsfield", base)
   url.searchParams.set("gid", generationId)

@@ -3,6 +3,7 @@ import "server-only"
 import { MODELS } from "@/generation/catalog"
 import { collections } from "@/lib/db/collections"
 import { env } from "@/lib/env"
+import { isSupabaseBackend } from "@/lib/backend"
 
 import { creditConfig } from "./config"
 import { fromPrice, toCreditTable, type CreditTable } from "./price"
@@ -76,12 +77,15 @@ export function invalidatePricing(): void {
 
 /** What client pages need: credit rules (no USD) and enabled model ids. */
 export type ClientPricing = {
+  mode?: "credits" | "api-key"
   table: CreditTable
   disabled: string[]
   fromPrices: Record<string, number>
 }
 
 export async function clientPricing(): Promise<ClientPricing> {
+  if (isSupabaseBackend())
+    return { mode: "api-key", table: {}, disabled: [], fromPrices: {} }
   const context = await pricingContext()
   const fromPrices: Record<string, number> = {}
   for (const model of MODELS) {

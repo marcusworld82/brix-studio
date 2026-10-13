@@ -19,6 +19,8 @@ export interface OutputView {
 }
 
 export interface GenerationView {
+  billingSource?: "higgsfield-api"
+  apiCostEstimate?: number | null
   id: string
   surface: Surface
   modelId: string

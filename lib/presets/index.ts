@@ -6,6 +6,7 @@ import { z } from "zod"
 import { findModel } from "@/generation/catalog"
 import { UserFacingError } from "@/lib/errors"
 import { collections, type PresetDoc } from "@/lib/db/collections"
+import { isSupabaseBackend } from "@/lib/backend"
 
 import { PRESET_LOOPS, PRESET_SEED } from "./seed-data"
 
@@ -78,6 +79,10 @@ export async function seedPresets(): Promise<number> {
 export async function listPresets(
   options: { includeInactive?: boolean } = {}
 ): Promise<PresetView[]> {
+  if (isSupabaseBackend()) {
+    const { listSupabasePresets } = await import("@/lib/supabase/presets")
+    return listSupabasePresets(options.includeInactive)
+  }
   const { presets } = await collections()
   const docs = await presets
     .find(options.includeInactive ? {} : { active: true })
@@ -87,6 +92,8 @@ export async function listPresets(
 }
 
 export async function getPreset(slug: string): Promise<PresetView | null> {
+  if (isSupabaseBackend())
+    return (await listPresets()).find((preset) => preset.slug === slug) ?? null
   if (!/^[a-z0-9-]{1,80}$/.test(slug)) return null
   const { presets } = await collections()
   const doc = await presets.findOne({ slug, active: true })
@@ -128,6 +135,10 @@ export async function upsertPreset(
     throw new UserFacingError(
       "The model's surface must match the preset's surface."
     )
+  if (isSupabaseBackend()) {
+    const { writeSupabasePreset } = await import("@/lib/supabase/presets")
+    return writeSupabasePreset(input, id)
+  }
   const { presets } = await collections()
   const now = new Date()
   if (id) {
@@ -151,6 +162,10 @@ export async function upsertPreset(
 }
 
 export async function deletePreset(id: string): Promise<void> {
+  if (isSupabaseBackend()) {
+    const { removeSupabasePreset } = await import("@/lib/supabase/presets")
+    return removeSupabasePreset(id)
+  }
   if (!ObjectId.isValid(id)) throw new UserFacingError("Preset not found.")
   const { presets } = await collections()
   await presets.deleteOne({ _id: new ObjectId(id) })

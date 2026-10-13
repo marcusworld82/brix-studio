@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
+import { createServerClient } from "@supabase/ssr"
+import { isSupabaseBackend } from "@/lib/backend"
 
 /**
  * Next 16 proxy (formerly middleware). UX only: bounce signed-out visitors
@@ -13,8 +15,52 @@ const SESSION_COOKIES = [
   "__Secure-authjs.session-token",
 ]
 
-export function proxy(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl
+  if (isSupabaseBackend()) {
+    let response = NextResponse.next({ request })
+    const client = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
+      {
+        cookieOptions: {
+          httpOnly: true,
+          sameSite: "lax",
+          secure: process.env.NODE_ENV === "production",
+        },
+        cookies: {
+          getAll: () => request.cookies.getAll(),
+          setAll: (values) => {
+            values.forEach(({ name, value }) =>
+              request.cookies.set(name, value)
+            )
+            response = NextResponse.next({ request })
+            values.forEach(({ name, value, options }) =>
+              response.cookies.set(name, value, options)
+            )
+          },
+        },
+      }
+    )
+    const {
+      data: { user },
+    } = await client.auth.getUser()
+    if (
+      !user &&
+      PRIVATE.some(
+        (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+      )
+    ) {
+      const login = new URL("/login", request.url)
+      login.searchParams.set("callbackUrl", `${pathname}${search}`)
+      const redirected = NextResponse.redirect(login)
+      response.cookies
+        .getAll()
+        .forEach((cookie) => redirected.cookies.set(cookie))
+      return redirected
+    }
+    return response
+  }
   if (
     !PRIVATE.some(
       (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
@@ -30,9 +76,6 @@ export function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/assets/:path*",
-    "/account/:path*",
-    "/admin/:path*",
-    "/projects/:path*",
+    "/((?!_next/static|_next/image|favicon.ico|icon.svg|media/|model-icons/|api/webhooks/|api/cron/).*)",
   ],
 }

@@ -8,6 +8,9 @@ import { finalizeGeneration } from "@/lib/generations/finalize"
 import { asRecord } from "@/lib/higgsfield/client"
 import { verifyWebhookToken } from "@/lib/higgsfield/webhook"
 import { json } from "@/lib/http"
+import { isSupabaseBackend } from "@/lib/backend"
+import { createSupabaseServiceClient } from "@/lib/supabase/server"
+import { finalizeUserGeneration } from "@/lib/supabase/generations"
 
 export const runtime = "nodejs"
 
@@ -39,6 +42,48 @@ export async function POST(request: Request) {
   )
     return json({ error: "Invalid webhook envelope" }, 400)
 
+  if (isSupabaseBackend()) {
+    const client = createSupabaseServiceClient()
+    const { data: row } = await client
+      .from("brix_generations")
+      .select()
+      .eq("id", gid)
+      .maybeSingle()
+    if (
+      !row ||
+      (row.provider_request_id && row.provider_request_id !== requestId)
+    )
+      return json({ ok: true, ignored: true })
+    if (!row.provider_request_id)
+      await client
+        .from("brix_generations")
+        .update({ provider_request_id: requestId })
+        .eq("id", gid)
+        .is("provider_request_id", null)
+    if (
+      row.status === "failed" &&
+      status === "completed" &&
+      ["submit", "timeout"].includes(row.error_kind ?? "")
+    )
+      await client
+        .from("brix_generations")
+        .update({
+          status: "in_progress",
+          error: null,
+          error_kind: null,
+          finished_at: null,
+        })
+        .eq("id", gid)
+        .eq("status", "failed")
+    after(async () => {
+      try {
+        await finalizeUserGeneration(gid)
+      } catch {
+        console.error("[webhook] Supabase generation refresh will be retried.")
+      }
+    })
+    return json({ ok: true })
+  }
   const { generations, hfWebhookEvents } = await collections()
   const generationId = new ObjectId(gid)
   let duplicate = false

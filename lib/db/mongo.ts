@@ -3,6 +3,7 @@ import "server-only"
 import { MongoClient, type Db } from "mongodb"
 
 import { env } from "@/lib/env"
+import { isSupabaseBackend } from "@/lib/backend"
 
 /**
  * One MongoClient per process, shared by the Auth.js adapter and the app.
@@ -28,6 +29,8 @@ export class DatabaseNotConfiguredError extends Error {
 }
 
 function uri(): string {
+  if (isSupabaseBackend())
+    throw new Error("MongoDB is disabled on the Supabase backend.")
   const value = env().MONGODB_URI
   if (!value) throw new DatabaseNotConfiguredError()
   return value

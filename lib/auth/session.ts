@@ -3,6 +3,11 @@ import "server-only"
 import { ObjectId } from "mongodb"
 
 import { auth } from "@/auth"
+import { isSupabaseBackend } from "@/lib/backend"
+import {
+  createSupabaseSessionClient,
+  createSupabaseServiceClient,
+} from "@/lib/supabase/server"
 import type { Role } from "@/lib/db/collections"
 import { NotFoundError, UnauthorizedError } from "@/lib/errors"
 
@@ -19,6 +24,40 @@ export type SessionUser = {
 }
 
 export async function currentUser(): Promise<SessionUser | null> {
+  if (isSupabaseBackend()) {
+    const client = await createSupabaseSessionClient()
+    const { data, error } = await client.auth.getUser()
+    if (error || !data.user?.email) return null
+    const { data: profile } = await client
+      .from("brix_profiles")
+      .select("role, display_name")
+      .eq("id", data.user.id)
+      .single()
+    const admin =
+      profile?.role === "admin" ||
+      (process.env.ADMIN_EMAILS ?? "")
+        .split(",")
+        .some(
+          (email) =>
+            email.trim().toLowerCase() === data.user!.email!.toLowerCase()
+        )
+    if (admin && profile?.role !== "admin")
+      await createSupabaseServiceClient()
+        .from("brix_profiles")
+        .update({ role: "admin" })
+        .eq("id", data.user.id)
+    return {
+      id: data.user.id,
+      get objectId(): ObjectId {
+        throw new Error(
+          "Legacy database access is disabled for Supabase users."
+        )
+      },
+      role: admin ? "admin" : "user",
+      email: data.user.email,
+      name: profile?.display_name,
+    }
+  }
   const session = await auth()
   const user = session?.user
   if (!user?.id || !ObjectId.isValid(user.id)) return null

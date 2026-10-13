@@ -11,6 +11,8 @@ import {
 import { CookieConsent } from "@/components/site/cookie-consent"
 import { getBalance } from "@/lib/account"
 import { currentUser } from "@/lib/auth/session"
+import { isSupabaseBackend } from "@/lib/backend"
+import { connectionStatus } from "@/lib/supabase/connections"
 import { BRAND } from "@/lib/brand"
 import { clientPricing, type ClientPricing } from "@/lib/billing/pricing"
 import { cn } from "@/lib/utils"
@@ -64,6 +66,20 @@ async function bootstrap(): Promise<{
   try {
     const user = await currentUser()
     if (!user) return { user: null, credits: null, pricing }
+    if (isSupabaseBackend()) {
+      const connection = await connectionStatus()
+      return {
+        user: {
+          id: user.id,
+          role: user.role,
+          email: user.email,
+          name: user.name,
+          apiKeyConnected: connection.connected,
+        },
+        credits: null,
+        pricing,
+      }
+    }
     const balance = await getBalance(user.objectId)
     return {
       user: {
