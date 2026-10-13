@@ -1,6 +1,6 @@
 # BRIX studio
 
-BRIX uses email sign-in and each user's Higgsfield API key and API balance.
+BRIX uses verified email and password accounts and each user's Higgsfield API key and API balance.
 Set APP_BACKEND=supabase for the full studio. Supabase provides authentication,
 Postgres, and private media storage. Resend sends login emails from a verified domain.
 Server secrets stay in .env.local locally and Vercel production environment variables.

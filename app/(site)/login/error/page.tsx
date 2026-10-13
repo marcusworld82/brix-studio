@@ -18,8 +18,8 @@ const ERRORS: Record<string, Copy> = {
   Verification: {
     icon: Clock,
     title: "That link has expired",
-    body: "Sign-in links work once and only for an hour. It may have been used already, or opened after it expired. Request a fresh one and you'll be in.",
-    action: "Send a new link",
+    body: "Sign-in links work once and only for an hour. It may have been used already, or opened after it expired. Return to login to request a new verification or password reset email.",
+    action: "Back to log in",
   },
   AccessDenied: {
     icon: ShieldAlert,

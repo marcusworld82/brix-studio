@@ -12,6 +12,7 @@ import { newProject, ownProject, changeProject } from "../lib/supabase/library"
 const appUrl = process.env.BRIX_CHECK_URL ?? "http://localhost:3000"
 const service = createSupabaseServiceClient()
 const users: string[] = []
+const fixturePassword = randomUUID() + "Aa1!"
 const cookies: Record<string, string> = {}
 let storagePath: string | undefined
 try {
@@ -19,19 +20,12 @@ try {
     const { data, error } = await service.auth.admin.createUser({
       email: `brix-check-${randomUUID()}@example.com`,
       email_confirm: true,
+      password: fixturePassword,
     })
     assert.ifError(error)
     assert(data.user)
     users.push(data.user.id)
   }
-  const { data: link, error: linkError } =
-    await service.auth.admin.generateLink({
-      type: "magiclink",
-      email: (await service.auth.admin.getUserById(users[0]!)).data.user!
-        .email!,
-    })
-  assert.ifError(linkError)
-  assert(link.properties)
   const session = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!,
@@ -46,9 +40,9 @@ try {
       },
     }
   )
-  const { error: loginError } = await session.auth.verifyOtp({
-    token_hash: link.properties.hashed_token,
-    type: link.properties.verification_type,
+  const { error: loginError } = await session.auth.signInWithPassword({
+    email: (await service.auth.admin.getUserById(users[0]!)).data.user!.email!,
+    password: fixturePassword,
   })
   assert.ifError(loginError)
   const headers = {

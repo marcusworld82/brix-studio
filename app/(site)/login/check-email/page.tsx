@@ -23,9 +23,9 @@ export default function CheckEmailPage() {
             Check your email
           </h1>
           <p className="text-sm text-muted-foreground">
-            We sent you a sign-in link. Open it on this device and you&apos;ll
-            land right back in {BRAND.name}. The link works once and expires in
-            an hour.
+            Open the verification or password reset link we sent. Then return to{" "}
+            {BRAND.name} and log in with your email and password. The link works
+            once.
           </p>
         </div>
         <ul className="flex w-full flex-col gap-2 rounded-2xl bg-surface p-4 text-left text-sm text-muted-foreground">
@@ -33,16 +33,6 @@ export default function CheckEmailPage() {
             • Nothing yet? Give it a minute, then check spam or promotions.
           </li>
           <li>• Make sure you typed the address you meant to use.</li>
-          <li>
-            • Still stuck? Write to{" "}
-            <a
-              href={`mailto:${BRAND.supportEmail}`}
-              className="text-foreground underline underline-offset-2"
-            >
-              {BRAND.supportEmail}
-            </a>
-            .
-          </li>
         </ul>
         <Link
           href="/login"

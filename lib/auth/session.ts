@@ -27,7 +27,7 @@ export async function currentUser(): Promise<SessionUser | null> {
   if (isSupabaseBackend()) {
     const client = await createSupabaseSessionClient()
     const { data, error } = await client.auth.getUser()
-    if (error || !data.user?.email) return null
+    if (error || !data.user?.email || !data.user.email_confirmed_at) return null
     const { data: profile } = await client
       .from("brix_profiles")
       .select("role, display_name")

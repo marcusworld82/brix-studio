@@ -56,3 +56,15 @@ export function createSupabaseServiceClient() {
     },
   })
 }
+
+/** An isolated auth client. Verification/recovery never sets browser cookies. */
+export function createSupabaseVerificationClient() {
+  const { url, key } = publicConfig()
+  return createClient<SupabaseDatabase>(url, key, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+      detectSessionInUrl: false,
+    },
+  })
+}

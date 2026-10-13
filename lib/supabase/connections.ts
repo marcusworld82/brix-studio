@@ -19,7 +19,7 @@ function cipherSecret(): string {
 async function signedInUser() {
   const client = await createSupabaseSessionClient()
   const { data, error } = await client.auth.getUser()
-  if (error || !data.user) throw new UnauthorizedError()
+  if (error || !data.user?.email_confirmed_at) throw new UnauthorizedError()
   return { client, user: data.user }
 }
 

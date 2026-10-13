@@ -9,18 +9,30 @@ export function LoginPanel({
   initialMode,
   callbackUrl,
   reason,
+  notice,
 }: {
   initialMode: "login" | "signup"
   callbackUrl: string
   reason?: string
+  notice?: string
 }) {
   const [mode, setMode] = useState(initialMode)
   return (
-    <LoginForm
-      mode={mode}
-      callbackUrl={callbackUrl}
-      reason={reason}
-      onModeChange={setMode}
-    />
+    <div className="flex w-full flex-col gap-5">
+      {notice ? (
+        <p
+          role="status"
+          className="rounded-xl border border-lime/30 bg-lime/10 p-3 text-sm"
+        >
+          {notice}
+        </p>
+      ) : null}
+      <LoginForm
+        mode={mode}
+        callbackUrl={callbackUrl}
+        reason={reason}
+        onModeChange={setMode}
+      />
+    </div>
   )
 }

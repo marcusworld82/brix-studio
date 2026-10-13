@@ -16,7 +16,7 @@ Hosted authentication, storage, and privacy checks must pass before public deplo
 
 ## User flow
 
-Email sign-in -> connect Higgsfield API credentials -> choose a model -> generate using that user's Higgsfield API balance.
+Create password -> verify email -> log in with email/password -> connect Higgsfield API credentials -> choose a model -> generate using that user's Higgsfield API balance.
 
 No Higgsfield subscription sign-in is part of this flow. The email account identifies the BRIX user. The API connection authorizes generation on that user's provider account.
 
@@ -65,3 +65,6 @@ Do not publish this as a working user-key studio until credential isolation and 
 - `tests/supabase-schema.test.ts` runs the migration in local PostgreSQL via PGlite
   with Supabase auth/storage primitives stubbed. This validates SQL and database
   access rules, not hosted email delivery or Storage HTTP behavior.
+
+## Password accounts
+New signup uses Supabase signup link generation with a password, mailed through Resend. Verification uses an isolated client and redirects to login without setting a browser session. Verified users log in with email and password. Existing passwordless users set a password through Forgot password. Recovery tokens authorize only password updates in an isolated auth client. Successful reset returns to login. Old BRIX magic-link routes and actions no longer sign in Supabase users. Profiles, admin roles, API connections, and media ownership are preserved.

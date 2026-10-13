@@ -9,7 +9,7 @@ import { BRAND } from "@/lib/brand"
 
 export const metadata: Metadata = {
   title: "Log in",
-  description: `Sign in to ${BRAND.name} with a magic link. No password needed.`,
+  description: `Log in to ${BRAND.name} with your email and password.`,
   robots: { index: false },
 }
 
@@ -62,6 +62,12 @@ export default async function LoginPage({
   }
   if (signedIn) redirect(destination)
 
+  const notice =
+    first(params.verified) === "1"
+      ? "Email verified. Log in with your email and password."
+      : first(params.passwordUpdated) === "1"
+        ? "Password saved. Log in with your email and password."
+        : undefined
   const mode = first(params.mode) === "signup" ? "signup" : "login"
   const reason =
     destination !== "/" ? "Sign in to continue where you left off." : undefined
@@ -78,6 +84,7 @@ export default async function LoginPage({
               initialMode={mode}
               callbackUrl={destination}
               reason={reason}
+              notice={notice}
             />
           </div>
         </div>

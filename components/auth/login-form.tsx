@@ -5,12 +5,14 @@ import { useState, type FormEvent } from "react"
 import { ArrowLeft, Loader2, MailCheck } from "lucide-react"
 
 import { requestMagicLinkAction } from "@/app/actions/auth"
+import { PasswordLoginForm } from "./password-login-form"
+import { useApp } from "@/components/providers/app-providers"
 import { BRAND } from "@/lib/brand"
 
 import { LogoMark } from "../site/logo"
 
 /** Magic-link sign-in: one email field, then "check your email". */
-export function LoginForm({
+function MagicLinkForm({
   mode = "signup",
   callbackUrl = "/",
   reason,
@@ -155,5 +157,14 @@ export function LoginForm({
         </p>
       ) : null}
     </form>
+  )
+}
+
+export function LoginForm(props: Parameters<typeof MagicLinkForm>[0]) {
+  const { pricing } = useApp()
+  return pricing.mode === "api-key" ? (
+    <PasswordLoginForm {...props} />
+  ) : (
+    <MagicLinkForm {...props} />
   )
 }

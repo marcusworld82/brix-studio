@@ -33,7 +33,7 @@ function AuthModalInner() {
             {mode === "signup" ? "Sign up" : "Log in"}
           </DialogPrimitive.Title>
           <DialogPrimitive.Description className="sr-only">
-            Sign in with a magic link sent to your email.
+            Log in or create your account.
           </DialogPrimitive.Description>
           <div className="hidden w-1/2 p-3 md:block">
             <AuthShowcase />
