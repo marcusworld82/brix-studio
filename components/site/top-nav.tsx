@@ -43,7 +43,7 @@ export function TopNav({ compact = false }: { compact?: boolean }) {
   return (
     <header
       className={cn(
-        "sticky top-0 z-40 flex w-full shrink-0 items-center gap-4 bg-page/95 px-4 backdrop-blur-sm",
+        "sticky top-0 z-40 flex w-full min-w-0 shrink-0 items-center gap-2 bg-page/95 px-4 backdrop-blur-sm sm:gap-4",
         compact ? "h-12" : "h-[60px]"
       )}
     >
@@ -123,13 +123,24 @@ function AccountControls({ compact }: { compact: boolean }) {
     return (
       <>
         <Link
-          href="/account"
+          href={
+            user.apiKeyConnected
+              ? "https://open.higgsfield.ai/billing"
+              : "/account"
+          }
+          title={
+            user.apiKeyConnected
+              ? "View your API balance in Higgsfield Billing. A live wallet API is not available."
+              : undefined
+          }
+          target={user.apiKeyConnected ? "_blank" : undefined}
+          rel={user.apiKeyConnected ? "noopener noreferrer" : undefined}
           className={cn(
-            "rounded-[10px] bg-white/5 px-3 text-sm leading-8 font-medium",
+            "rounded-[10px] bg-white/5 px-2 text-xs leading-8 font-medium whitespace-nowrap sm:px-3 sm:text-sm",
             height
           )}
         >
-          {user.apiKeyConnected ? "API key saved" : "Connect API key"}
+          {user.apiKeyConnected ? "Balance unavailable" : "Connect API key"}
         </Link>
         <UserMenu />
         {user.role === "admin" ? (

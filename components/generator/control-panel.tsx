@@ -262,6 +262,11 @@ export function GenerateButton({
       >
         {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
         Generate
+        {generator.priceLabel ? (
+          <span className="font-mono tabular-nums" aria-live="polite">
+            {generator.priceLabel}
+          </span>
+        ) : null}
         {quote ? (
           <span className="flex items-center gap-1 font-mono">
             <Sparkle className="size-4 fill-current" aria-hidden />

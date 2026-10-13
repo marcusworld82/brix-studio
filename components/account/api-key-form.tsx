@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, type FormEvent } from "react"
+import { announceBalanceChange } from "@/components/providers/app-providers"
 import { useRouter } from "next/navigation"
 import {
   saveApiConnectionAction,
@@ -25,6 +26,7 @@ export function ApiKeyForm({ label, next }: { label?: string; next?: string }) {
       return
     }
     setMessage("API key saved. Higgsfield validates it when you generate.")
+    announceBalanceChange()
     router.refresh()
     if (next && next !== "/") router.push(next)
   }

@@ -75,7 +75,9 @@
     background-image:
       radial-gradient(rgba(151, 157, 172, 0.16) 1px, transparent 1px),
       linear-gradient(135deg, rgba(5, 130, 202, 0.08), rgba(0, 100, 148, 0.03));
-    background-size: 24px 24px, 100% 100%;
+    background-size:
+      24px 24px,
+      100% 100%;
   }
   html {
     @apply font-sans;
@@ -89,7 +91,9 @@
     background-image:
       radial-gradient(rgba(151, 157, 172, 0.16) 1px, transparent 1px),
       linear-gradient(135deg, rgba(5, 130, 202, 0.08), rgba(0, 100, 148, 0.03));
-    background-size: 24px 24px, 100% 100%;
+    background-size:
+      24px 24px,
+      100% 100%;
   }
   /* Display type: Space Grotesk 700, uppercase, −4% tracking. */
   .font-display {
@@ -209,4 +213,21 @@
 :focus-visible {
   outline: 2px solid var(--color-lime);
   outline-offset: 2px;
+}
+
+/* Keep the app viewport fixed while its own panels remain scrollable. */
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: clip;
+  overscroll-behavior-x: none;
+  touch-action: pan-x pan-y;
+}
+@media (pointer: coarse) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
 }

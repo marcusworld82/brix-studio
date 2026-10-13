@@ -43,8 +43,8 @@ export function GeneratorView({
 
 function PanelLayout({ generator }: { generator: Generator }) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2 md:flex-row md:overflow-hidden md:p-4 md:pt-2">
+    <div className="flex min-h-0 w-full max-w-full min-w-0 flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-x-hidden overflow-y-auto p-2 md:flex-row md:overflow-hidden md:p-4 md:pt-2">
         <ControlPanel generator={generator} />
         <Canvas generator={generator} />
       </div>
@@ -114,7 +114,7 @@ function ImageLayout({ generator }: { generator: Generator }) {
             }
             prompt={generator.prompt}
             onPromptChange={generator.setPrompt}
-            cost={generator.quote?.credits}
+            cost={generator.priceLabel ?? generator.quote?.credits}
             onGenerate={() => void generator.generate()}
             onCancel={() => undefined}
             generating={false}

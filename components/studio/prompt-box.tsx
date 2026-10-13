@@ -435,12 +435,17 @@ function Generate({
           <span className="q-prompt-box-generate-label">{children}</span>
           {hasMeta ? (
             <span className="q-prompt-box-generate-meta">
-              {start ?? <SparklesGlyph fill="currentColor" />}
+              {start ??
+                (typeof cost === "number" ? (
+                  <SparklesGlyph fill="currentColor" />
+                ) : null)}
               {oldCost != null ? (
                 <span className="q-prompt-box-generate-old">{oldCost}</span>
               ) : null}
               {cost != null ? (
-                <span className="q-prompt-box-generate-cost">{cost}</span>
+                <span className="q-prompt-box-generate-cost" aria-live="polite">
+                  {cost}
+                </span>
               ) : null}
             </span>
           ) : null}

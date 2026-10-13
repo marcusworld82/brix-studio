@@ -37,20 +37,13 @@ function providerMessage(error: unknown): string {
   return "Higgsfield couldn't complete this request. Try again later."
 }
 
-export async function submitUserGeneration(userId: string, raw: unknown) {
-  const input = submitSchema.parse(raw)
-  await enforceRateLimit(`submit:${userId}`, 20, 60)
+export async function prepareUserGeneration(
+  userId: string,
+  input: ReturnType<typeof submitSchema.parse>
+) {
   const client = createSupabaseServiceClient()
-  const { data: existing } = await client
-    .from("brix_generations")
-    .select()
-    .eq("user_id", userId)
-    .eq("submit_key", input.submitKey)
-    .maybeSingle()
-  if (existing) return generationView(existing)
   const model = findModel(input.modelId)
   if (!model) throw new UserFacingError("Unknown model.")
-  const connection = await clientForConnection(userId)
   const media = await Promise.all(
     input.media.map(async (m, index) => {
       const path = pathFromMediaUrl(m.url, userId)
@@ -82,6 +75,51 @@ export async function submitUserGeneration(userId: string, raw: unknown) {
       "Check the prompt, settings, and required references."
     )
   }
+  return { model, media, plane, request }
+}
+
+export async function estimateUserGeneration(userId: string, raw: unknown) {
+  const input = submitSchema.parse(raw)
+  await enforceRateLimit(`estimate:${userId}`, 120, 60)
+  const { request } = await prepareUserGeneration(userId, input)
+  const connection = await clientForConnection(userId)
+  try {
+    const result = await connection.client.estimate(request.path, request.body)
+    return {
+      status: "ready" as const,
+      usd: result.usd,
+      currency: "USD" as const,
+      quotedAt: Date.now(),
+    }
+  } catch (caught) {
+    if (caught instanceof EstimateDescriptionError)
+      return {
+        status: "variable" as const,
+        usd: null,
+        currency: "USD" as const,
+        description:
+          "Higgsfield does not return a fixed dollar price for this configuration.",
+      }
+    throw new UserFacingError(providerMessage(caught))
+  }
+}
+
+export async function submitUserGeneration(userId: string, raw: unknown) {
+  const input = submitSchema.parse(raw)
+  await enforceRateLimit(`submit:${userId}`, 20, 60)
+  const client = createSupabaseServiceClient()
+  const { data: existing } = await client
+    .from("brix_generations")
+    .select()
+    .eq("user_id", userId)
+    .eq("submit_key", input.submitKey)
+    .maybeSingle()
+  if (existing) return generationView(existing)
+  const { model, media, plane, request } = await prepareUserGeneration(
+    userId,
+    input
+  )
+  const connection = await clientForConnection(userId)
   let estimate: number | null = null
   try {
     estimate = (await connection.client.estimate(request.path, request.body))
@@ -90,6 +128,19 @@ export async function submitUserGeneration(userId: string, raw: unknown) {
     if (!(caught instanceof EstimateDescriptionError))
       throw new UserFacingError(providerMessage(caught))
   }
+  if (estimate === null)
+    throw new UserFacingError(
+      "Higgsfield cannot provide a fixed dollar price for this configuration.",
+      "PRICE_UNAVAILABLE"
+    )
+  if (
+    input.expectedUsd === undefined ||
+    Math.abs(input.expectedUsd - estimate) > 0.0000001
+  )
+    throw new UserFacingError(
+      "The price changed. Wait for the updated price, then press Generate again.",
+      "PRICE_CHANGED"
+    )
   const ratio = String(plane.settings.aspectRatio ?? "1:1")
     .split(":")
     .map(Number)

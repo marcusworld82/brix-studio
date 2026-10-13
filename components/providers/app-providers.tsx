@@ -19,6 +19,7 @@ import { Toaster, useToast } from "./toaster"
 
 export type ClientUser = {
   apiKeyConnected?: boolean
+  apiConnectionVersion?: string
   id: string
   role: "user" | "admin"
   email: string

@@ -6,6 +6,18 @@ Postgres, and private media storage. Resend sends login emails from a verified d
 Server secrets stay in .env.local locally and Vercel production environment variables.
 See docs/byok-architecture.md and supabase/migrations for the current backend.
 
+In Supabase mode, Generate shows a live USD estimate from the user's API key.
+Changing model settings or reference media requests a new quote. Submitting checks
+that price again and blocks changed or unavailable prices before creating a paid job.
+Small prices retain their fractional precision, such as $0.004.
+
+Higgsfield's documented public API currently has no wallet-balance endpoint.
+The profile header links to API Billing and displays "Balance unavailable" rather
+than confusing website subscription credits with API dollars. No local balance is invented.
+Mobile viewport gestures and horizontal page overflow are restricted, with 16px
+form controls on touch devices to prevent iOS focus zoom. Browser accessibility
+settings can override viewport zoom restrictions.
+
 The original credit-based MongoDB setup below is retained for legacy mode only.
 
 # BRIX — AI image & video studio

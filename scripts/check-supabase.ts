@@ -78,6 +78,32 @@ try {
   assert.equal(me.user.id, users[0])
   assert.equal(me.mode, "api-key")
   assert.equal(me.connection.connected, false)
+  const priceInput = {
+    submitKey: randomUUID(),
+    modelId: "soul-2",
+    prompt: "A landscape",
+    settings: {},
+    media: [],
+  }
+  const anonymousQuote = await fetch(`${appUrl}/api/generations/estimate`, {
+    method: "POST",
+    headers: { "content-type": "application/json", origin: appUrl },
+    body: JSON.stringify(priceInput),
+  })
+  assert.equal(anonymousQuote.status, 401)
+  const foreignQuote = await fetch(`${appUrl}/api/generations/estimate`, {
+    method: "POST",
+    headers: { ...headers, origin: "https://example.com" },
+    body: JSON.stringify(priceInput),
+  })
+  assert.equal(foreignQuote.status, 403)
+  const missingKeyQuote = await fetch(`${appUrl}/api/generations/estimate`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(priceInput),
+  })
+  assert.equal(missingKeyQuote.status, 400)
+  assert.equal((await missingKeyQuote.json()).code, "API_KEY_REQUIRED")
   const cipher = encryptCredentials(
     "test-key-id:test-key-secret",
     users[0]!,

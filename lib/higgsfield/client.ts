@@ -236,7 +236,12 @@ export function createHiggsfieldClient(options: ClientOptions) {
         )
       const credits = Number(payload.credits)
       const usd = Number(payload.usd)
-      if (!Number.isFinite(usd))
+      if (
+        payload.usd == null ||
+        String(payload.usd).trim() === "" ||
+        !Number.isFinite(usd) ||
+        usd < 0
+      )
         throw new PlatformError(502, { detail: "Estimate missing usd" })
       return { credits: Number.isFinite(credits) ? credits : 0, usd }
     },

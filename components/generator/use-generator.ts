@@ -1,5 +1,7 @@
 "use client"
 
+import { useApiPrice } from "./use-api-price"
+import { formatUsd } from "@/lib/billing/usd"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { usePathname, useRouter, useSearchParams } from "next/navigation"
 
@@ -219,6 +221,39 @@ export function useGenerator(surface: Surface, presets: PresetView[] = []) {
     [finalPrompt, media, model, pricing.table, pricing.mode, settings]
   )
 
+  const apiMode = pricing.mode === "api-key"
+  const apiPriceInput =
+    validation.plane && model
+      ? {
+          modelId: model.id,
+          prompt: finalPrompt,
+          settings,
+          media: media.map((m) => ({
+            role: m.role,
+            url: m.url,
+            ...(m.name ? { name: m.name } : {}),
+          })),
+        }
+      : null
+  const apiPrice = useApiPrice(
+    apiPriceInput,
+    apiMode && !!user?.apiKeyConnected,
+    user?.apiConnectionVersion
+  )
+  const priceLabel = apiMode
+    ? apiPrice.status === "ready" && apiPrice.usd !== null
+      ? formatUsd(apiPrice.usd)
+      : apiPrice.status === "loading"
+        ? "Pricing…"
+        : apiPrice.status === "variable"
+          ? "Usage-based"
+          : apiPrice.status === "idle"
+            ? "Price pending"
+            : "Price unavailable"
+    : undefined
+  const priceBlocked =
+    apiMode && !!user?.apiKeyConnected && apiPrice.status !== "ready"
+
   const hasInput = finalPrompt.trim().length > 0 || media.length > 0
   // The endpoint these settings reach has no price (yet) on this deployment.
   const unpriced =
@@ -231,11 +266,20 @@ export function useGenerator(surface: Surface, presets: PresetView[] = []) {
       ? "Describe what you want to create."
       : "Add a prompt or a reference."
     : (validation.error ??
+      (priceBlocked
+        ? apiPrice.status === "loading"
+          ? "Updating the dollar price…"
+          : (apiPrice.error ?? "Wait for a dollar price before generating.")
+        : undefined) ??
       (unpriced
         ? "This option isn't available yet. Try another model or setting."
         : undefined))
   const canGenerate =
-    Boolean(validation.plane) && hasInput && !unpriced && !submitting
+    Boolean(validation.plane) &&
+    hasInput &&
+    !unpriced &&
+    !priceBlocked &&
+    !submitting
 
   /* ── Actions ───────────────────────────────────────────────────────────── */
   const generate = useCallback(async () => {
@@ -256,9 +300,16 @@ export function useGenerator(surface: Surface, presets: PresetView[] = []) {
       )
       return
     }
+    if (apiMode && (apiPrice.status !== "ready" || apiPrice.usd === null)) {
+      setSubmitting(false)
+      return
+    }
     setError(null)
     const result = await runs.submit({
       submitKey: newKey(),
+      ...(apiMode && apiPrice.usd !== null
+        ? { expectedUsd: apiPrice.usd }
+        : {}),
       modelId: model.id,
       prompt: finalPrompt,
       settings,
@@ -271,6 +322,8 @@ export function useGenerator(surface: Surface, presets: PresetView[] = []) {
     })
     setSubmitting(false)
     if (!result.ok) {
+      if (result.code === "PRICE_CHANGED")
+        window.dispatchEvent(new Event("vireo:balance"))
       if (result.code === "INSUFFICIENT_CREDITS") {
         openUpgrade(result.error)
         return
@@ -285,6 +338,8 @@ export function useGenerator(surface: Surface, presets: PresetView[] = []) {
     if (result.record.status === "failed")
       toast.error("Generation couldn't start", result.record.error)
   }, [
+    apiMode,
+    apiPrice,
     finalPrompt,
     media,
     model,
@@ -304,12 +359,21 @@ export function useGenerator(surface: Surface, presets: PresetView[] = []) {
 
   // Continue the Generate press that required sign-in (dock state was kept).
   useEffect(() => {
-    if (!pendingResume.current || !user || !validation.plane || submitting)
+    if (
+      !pendingResume.current ||
+      !user ||
+      !validation.plane ||
+      submitting ||
+      priceBlocked
+    )
       return
     pendingResume.current = false
-    toast.info("Continuing your generation…")
-    void generate()
-  }, [generate, submitting, toast, user, validation.plane])
+    if (apiMode) {
+      toast.info("Review the dollar price, then press Generate.")
+      return
+    }
+    toast.info("Signed in. Press Generate to continue.")
+  }, [apiMode, submitting, toast, user, validation.plane, priceBlocked])
 
   const setPrompt = useCallback(
     (value: string) => setPromptState(surface, value),
@@ -460,6 +524,7 @@ export function useGenerator(surface: Surface, presets: PresetView[] = []) {
     },
     library: { items: libraryItems, onUpload: upload },
     quote,
+    priceLabel,
     canGenerate,
     disabledReason,
     generate,

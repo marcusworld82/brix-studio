@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next"
 import { IBM_Plex_Mono, Inter, Space_Grotesk } from "next/font/google"
 import { unstable_rethrow } from "next/navigation"
 
+import { MobileViewportGuard } from "@/components/site/mobile-viewport-guard"
 import { AuthModal } from "@/components/auth/auth-modal"
 import { UpgradeModal } from "@/components/billing/upgrade-modal"
 import {
@@ -55,7 +56,15 @@ export const metadata: Metadata = {
   icons: { icon: "/icon.svg" },
 }
 
-export const viewport: Viewport = { themeColor: "#0f1113", colorScheme: "dark" }
+export const viewport: Viewport = {
+  themeColor: "#0f1113",
+  colorScheme: "dark",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
+}
 
 /** Session, live balance and pricing for the client providers. Signed-out on DB errors. */
 async function bootstrap(): Promise<{
@@ -76,6 +85,7 @@ async function bootstrap(): Promise<{
           email: user.email,
           name: user.name,
           apiKeyConnected: connection.connected,
+          apiConnectionVersion: connection.savedAt,
         },
         credits: null,
         pricing,
@@ -127,6 +137,7 @@ export default async function RootLayout({
           Skip to content
         </a>
         <AppProviders user={user} initialCredits={credits} pricing={pricing}>
+          <MobileViewportGuard />
           {children}
           <AuthModal />
           <UpgradeModal />
