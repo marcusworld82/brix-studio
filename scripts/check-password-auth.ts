@@ -67,7 +67,7 @@ async function actionIds() {
     )
     for (const { u, body } of scripts) {
       for (const m of body.matchAll(
-        /([a-f0-9]{42})"[^;]{0,180}"(loginPasswordAction|setPasswordAction|signOutAction)"/g
+        /createServerReference\)\("([a-f0-9]{42})",[^)]*,"(loginPasswordAction|setPasswordAction|signOutAction)"\)/g
       ))
         result[m[2]!] = m[1]!
       urls.push(
@@ -87,7 +87,7 @@ async function actionIds() {
   for (const u of resetUrls) {
     const body = await (await fetch(u)).text()
     for (const m of body.matchAll(
-      /([a-f0-9]{42})"[^;]{0,180}"(setPasswordAction)"/g
+      /createServerReference\)\("([a-f0-9]{42})",[^)]*,"(setPasswordAction)"\)/g
     ))
       result[m[2]!] = m[1]!
   }
