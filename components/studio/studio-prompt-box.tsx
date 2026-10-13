@@ -1,5 +1,7 @@
 "use client"
 
+import { VideoThumbnail } from "@/components/media/video-thumbnail"
+
 import { useRef, useState, type ChangeEvent, type ReactNode } from "react"
 import {
   AudioLines,
@@ -185,15 +187,7 @@ function PillSelect({
 function MediaPreview({ item }: { item: MediaItem }) {
   const kind = item.kind ?? ROLE_KIND[item.role]
   if (kind === "video")
-    return (
-      <video
-        src={item.url}
-        muted
-        playsInline
-        preload="metadata"
-        className="size-full object-cover"
-      />
-    )
+    return <VideoThumbnail src={item.url} name={item.name} />
   if (kind === "audio") return <AudioLines className="size-5" />
   return (
     // eslint-disable-next-line @next/next/no-img-element -- User uploads bypass the image proxy.

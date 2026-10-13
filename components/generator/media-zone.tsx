@@ -1,5 +1,7 @@
 "use client"
 
+import { VideoThumbnail } from "@/components/media/video-thumbnail"
+
 /* eslint-disable @next/next/no-img-element */
 import { useState, type DragEvent } from "react"
 import {
@@ -66,15 +68,7 @@ function slotHint(model: ModelEntry, role: MediaRole): string {
 function Preview({ item }: { item: MediaItem }) {
   const kind = item.kind ?? ROLE_KIND[item.role]
   if (kind === "video")
-    return (
-      <video
-        src={item.url}
-        muted
-        playsInline
-        preload="metadata"
-        className="size-full object-cover"
-      />
-    )
+    return <VideoThumbnail src={item.url} name={item.name} />
   if (kind === "audio")
     return (
       <span className="flex size-full items-center justify-center bg-raised">

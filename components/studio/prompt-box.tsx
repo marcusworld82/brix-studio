@@ -1,5 +1,7 @@
 "use client"
 
+import { VideoThumbnail } from "@/components/media/video-thumbnail"
+
 import { Children, isValidElement } from "react"
 import type {
   ComponentProps,
@@ -354,13 +356,10 @@ function Upload({
                 <AudioLines className="size-7 text-q-icon-secondary" />
               </span>
             ) : mediaType === "video" ? (
-              <video
-                className="q-prompt-box-upload-media"
+              <VideoThumbnail
                 src={src}
-                aria-label={alt}
-                muted
-                playsInline
-                preload="metadata"
+                name={alt}
+                className="q-prompt-box-upload-media"
               />
             ) : (
               // eslint-disable-next-line @next/next/no-img-element -- User uploads bypass the image proxy.

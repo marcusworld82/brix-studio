@@ -1,5 +1,7 @@
 "use client"
 
+import { VideoThumbnail } from "@/components/media/video-thumbnail"
+
 import { useMemo, useRef, useState } from "react"
 import type { DragEvent, ReactElement } from "react"
 import {
@@ -425,13 +427,7 @@ function ElementCard({
             <AudioLines className="size-8 text-q-icon-secondary" />
           </span>
         ) : item.kind === "video" ? (
-          <video
-            src={item.src}
-            muted
-            playsInline
-            preload="metadata"
-            className="size-full object-cover"
-          />
+          <VideoThumbnail src={item.src} name={item.name} />
         ) : (
           // eslint-disable-next-line @next/next/no-img-element
           <img

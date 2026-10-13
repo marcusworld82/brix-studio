@@ -232,3 +232,14 @@ image, Plus 6 / 8, Ultra 8 / 12.
   the URL plus re-fetching the status. Revisit if the docs add a signature.
 - **Accessibility:** secondary text is `#9a9b9d` (Quanta's `#828282` fails
   4.5:1 on card surfaces). Lighthouse accessibility: 97+ on the generators.
+
+## Uploaded video previews, 2026-10-13
+
+- Input tiles and the asset picker use a shared paused video thumbnail. They request
+  an early frame, preload video data, and seek just past frame zero. This avoids
+  blank metadata-only previews on mobile browsers.
+- Show a filename, loading status, or explicit preview failure rather than an empty
+  attached tile. A preview failure does not remove the uploaded reference.
+- Supabase video preview URLs go through BRIX's authenticated, ownership-checked
+  media route, which issues fresh storage links. Persisted expired storage tokens
+  are not reused for previews. Generation input URL handling is unchanged.
