@@ -27,7 +27,7 @@ export default async function EffectsPage() {
         <div className="mx-auto flex max-w-[1440px] flex-col items-start gap-5 px-4 pt-12 pb-10 md:items-center md:pt-20 md:pb-14 md:text-center">
           <Link
             href="/video"
-            className="font-display inline-flex h-8 items-center gap-1.5 rounded-full bg-lime/15 px-3 text-[13px] text-lime shadow-[0_0_24px_rgba(209,254,23,0.25)] transition-colors hover:bg-lime/25"
+            className="font-display inline-flex h-8 items-center gap-1.5 rounded-full bg-lime/15 px-3 text-[13px] text-lime shadow-[0_0_24px_rgba(5,130,202,0.25)] transition-colors hover:bg-lime/25"
           >
             <Sparkles className="size-3.5" aria-hidden /> Try for free
           </Link>

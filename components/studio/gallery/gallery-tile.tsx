@@ -202,7 +202,7 @@ function AudioMedia({ item }: { item: GalleryItem }) {
         <button
           type="button"
           aria-label={playing ? "Pause audio" : "Play audio"}
-          className="flex size-9 items-center justify-center rounded-full bg-lime text-[#131517]"
+          className="flex size-9 items-center justify-center rounded-full bg-lime text-white"
           onClick={(event) => {
             event.stopPropagation()
             const audio = ref.current

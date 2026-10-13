@@ -6,11 +6,25 @@ const ROUTES = [
   "/video",
   "/effects",
   "/effects/neon-noir",
-  "/community",
+  "/templates",
   "/pricing",
   "/login",
   "/legal/terms",
 ]
+
+test("selectors stay above the video settings dialog", async ({
+  page,
+}, testInfo) => {
+  await page.goto("/video?tab=edit&model=kling-o3-edit")
+  await page.getByRole("button", { name: "More settings" }).click()
+  const dialog = page.getByRole("dialog", { name: "Kling O3 Edit settings" })
+  await dialog.getByRole("combobox", { name: "Mode", exact: true }).click()
+  await page.screenshot({ path: testInfo.outputPath("settings-selector.png") })
+  await page.getByRole("option", { name: "std", exact: true }).click()
+  await expect(
+    dialog.getByRole("combobox", { name: "Mode", exact: true })
+  ).toContainText("std")
+})
 
 for (const route of ROUTES) {
   test(`${route} renders without console errors`, async ({ page }) => {

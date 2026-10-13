@@ -47,7 +47,7 @@ const PUBLIC_FILTER: Filter<GenerationDoc> = {
 function displayName(user?: Pick<UserDoc, "name" | "email"> | null): string {
   const name = user?.name?.trim()
   if (name) return name.split(/\s+/)[0]!.slice(0, 24)
-  return "Vireo creator"
+  return "BRIX creator"
 }
 
 async function withAuthors(docs: GenerationDoc[]): Promise<PublicGeneration[]> {

@@ -7,7 +7,7 @@ import { signIn, signOut } from "@/auth"
 import { runAction, UserFacingError } from "@/lib/action-result"
 import type { ActionResult } from "@/lib/action-types"
 import { isDisposableEmail, normalizeEmail } from "@/lib/auth/disposable"
-import { isE2eAddress } from "@/lib/email/send"
+import { isE2eAddress, requireEmailDelivery } from "@/lib/email/send"
 import { env } from "@/lib/env"
 import { LIMITS, rateLimit } from "@/lib/rate-limit"
 
@@ -34,6 +34,7 @@ export async function requestMagicLinkAction(input: {
         "Please use a permanent email address — disposable inboxes aren't supported.",
         "DISPOSABLE"
       )
+    requireEmailDelivery(email)
     const ip =
       (await headers()).get("x-forwarded-for")?.split(",")[0]?.trim() ||
       "unknown"

@@ -1,12 +1,13 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { notFound } from "next/navigation"
+import { notFound, redirect } from "next/navigation"
 
 import {
   AdminGenerations,
   AdminModels,
   AdminModeration,
   AdminPresets,
+  AdminTemplates,
   AdminUsers,
 } from "@/components/admin/admin-panels"
 import { MODELS } from "@/generation/catalog"
@@ -19,6 +20,7 @@ import {
 import { currentUser } from "@/lib/auth/session"
 import { pricingContext } from "@/lib/billing/pricing"
 import { listPresets } from "@/lib/presets"
+import { listOfficialTemplates } from "@/lib/templates"
 import { cn } from "@/lib/utils"
 
 export const metadata: Metadata = { title: "Admin", robots: { index: false } }
@@ -28,6 +30,7 @@ const TABS = [
   { id: "generations", label: "Generations" },
   { id: "models", label: "Models & pricing" },
   { id: "presets", label: "Effects" },
+  { id: "templates", label: "Templates" },
   { id: "moderation", label: "Moderation" },
 ] as const
 
@@ -39,6 +42,7 @@ export default async function AdminPage({
   searchParams: Promise<Record<string, string | undefined>>
 }) {
   const user = await currentUser()
+  if (!user) redirect("/login?callbackUrl=%2Fadmin")
   // Not an admin → the page simply doesn't exist.
   if (user?.role !== "admin") notFound()
   const params = await searchParams
@@ -98,6 +102,16 @@ export default async function AdminPage({
       {tab === "presets" ? (
         <AdminPresets
           presets={await listPresets({ includeInactive: true })}
+          models={MODELS.map((model) => ({
+            id: model.id,
+            label: model.label,
+            surface: model.surface,
+          }))}
+        />
+      ) : null}
+      {tab === "templates" ? (
+        <AdminTemplates
+          templates={await listOfficialTemplates({ includeInactive: true })}
           models={MODELS.map((model) => ({
             id: model.id,
             label: model.label,

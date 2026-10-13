@@ -1,5 +1,20 @@
 # Decisions
 
+## Loom revisions, 2026-10-12
+
+- Apply the blue and dot backdrop across the full page, generator canvas,
+  control panel, library sidebar, and login surface. Dots do not fade out.
+  Keep media and card surfaces readable. Use secondary blue `#0582CA` for the footer.
+- Portal selectors at z-index 60 so they appear above navigation, mobile
+  Generate controls, and settings dialogs. Keep positioning collision-aware.
+- Mobile video generators show one Generate control in a fixed-height footer
+  outside the scrolling workspace. Desktop retains its panel control.
+- Real sign-in emails require Resend configuration even in development.
+  Only reserved `.test` addresses can bypass delivery with E2E mode enabled,
+  outside the production deployment. Missing configuration is a visible error.
+- Admin access uses the existing role and `ADMIN_EMAILS` checks. Show the Admin
+  link to admins on desktop and mobile; direct signed-out visits lead to login.
+
 Every default the brief left to us, and every place the sources disagree.
 Newest decisions go at the bottom of each section.
 

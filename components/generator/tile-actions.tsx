@@ -3,11 +3,10 @@
 import { useCallback, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import {
+  BookmarkPlus,
   Clapperboard,
   Download,
   FolderPlus,
-  Globe,
-  GlobeLock,
   Loader2,
   RefreshCw,
   RotateCcw,
@@ -32,6 +31,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import {
+  SaveTemplateDialog,
+  type TemplateRecipe,
+} from "@/components/templates/save-template-dialog"
 import type { GenerationView, ProjectView } from "@/lib/generations/view"
 import type { Runs } from "@/lib/studio/use-runs"
 import { cn } from "@/lib/utils"
@@ -54,6 +57,7 @@ export function useTileActions({
   const toast = useToast()
   const [projectFor, setProjectFor] = useState<string[] | null>(null)
   const [deleteFor, setDeleteFor] = useState<string[] | null>(null)
+  const [templateFor, setTemplateFor] = useState<TemplateRecipe | null>(null)
 
   const actions = useCallback(
     (item: GalleryItem): TileAction[] => {
@@ -125,18 +129,19 @@ export function useTileActions({
             ]
           : []),
         {
-          id: "publish",
-          label: run.isPublic ? "Unpublish" : "Publish",
-          icon: run.isPublic ? GlobeLock : Globe,
-          onSelect: () =>
-            void runs.publish(run.id, !run.isPublic).then((ok) => {
-              if (ok)
-                toast.success(
-                  run.isPublic
-                    ? "Removed from Community"
-                    : "Published to Community"
-                )
-            }),
+          id: "template",
+          label: "Save as template",
+          icon: BookmarkPlus,
+          onSelect: () => {
+            const cover = run.outputs.find((output) => output.kind === "image")
+            setTemplateFor({
+              surface: run.surface,
+              modelId: run.modelId,
+              prompt: run.prompt,
+              settings: run.settings,
+              ...(cover ? { coverUrl: cover.url } : {}),
+            })
+          },
         },
         {
           id: "project",
@@ -152,6 +157,10 @@ export function useTileActions({
 
   const dialogs = (
     <>
+      <SaveTemplateDialog
+        recipe={templateFor}
+        onClose={() => setTemplateFor(null)}
+      />
       <ProjectPickerDialog
         runIds={projectFor}
         onClose={() => setProjectFor(null)}

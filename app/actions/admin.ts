@@ -14,6 +14,11 @@ import type { ActionResult } from "@/lib/action-types"
 import { requireAdmin } from "@/lib/auth/session"
 import type { Credits } from "@/lib/db/collections"
 import { deletePreset, upsertPreset, type PresetView } from "@/lib/presets"
+import {
+  deleteOfficialTemplate,
+  upsertOfficialTemplate,
+  type TemplateView,
+} from "@/lib/templates"
 
 export async function adjustCreditsAction(input: {
   userId: string
@@ -82,6 +87,29 @@ export async function deletePresetAction(
   })
 }
 
+export async function upsertTemplateAction(
+  input: Record<string, unknown>,
+  id?: string
+): Promise<ActionResult<TemplateView>> {
+  return runAction(async () => {
+    await requireAdmin()
+    const template = await upsertOfficialTemplate(input, id)
+    revalidatePath("/templates")
+    return template
+  })
+}
+
+export async function deleteTemplateAdminAction(
+  id: string
+): Promise<ActionResult<null>> {
+  return runAction(async () => {
+    await requireAdmin()
+    await deleteOfficialTemplate(id)
+    revalidatePath("/templates")
+    return null
+  })
+}
+
 export async function moderateAction(
   generationId: string,
   action: "unpublish" | "dismiss"
@@ -89,7 +117,6 @@ export async function moderateAction(
   return runAction(async () => {
     await requireAdmin()
     await moderate(generationId, action)
-    revalidatePath("/community")
     return null
   })
 }

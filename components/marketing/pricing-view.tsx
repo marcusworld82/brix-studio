@@ -94,7 +94,7 @@ function rowGroups(): { title: string; rows: Row[] }[] {
           values: (plan) => hasFeature(plan, "Commercial use"),
         },
         { label: "Personal library & projects", values: () => true },
-        { label: "Publish to Community", values: () => true },
+        { label: "Save your own templates", values: () => true },
       ],
     },
   ]

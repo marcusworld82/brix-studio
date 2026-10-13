@@ -30,7 +30,7 @@ export function ModelIcon({
 }
 
 const BADGE_CLASS: Record<ModelBadge, string> = {
-  NEW: "bg-lime text-[#131517]",
+  NEW: "bg-lime text-white",
   TOP: "bg-gradient-to-r from-[#4fc9dc] via-[#32a2ee] to-[#167bff] text-white",
   FAST: "bg-white/10 text-white",
   "4K": "bg-white/10 text-white",

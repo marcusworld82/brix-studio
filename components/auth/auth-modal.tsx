@@ -28,7 +28,7 @@ function AuthModalInner() {
     >
       <DialogPrimitive.Portal>
         <DialogPrimitive.Backdrop className="fixed inset-0 z-50 bg-black/80 duration-150 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0" />
-        <DialogPrimitive.Popup className="fixed top-1/2 left-1/2 z-50 flex max-h-[calc(100dvh-2rem)] w-[min(1120px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-3xl border border-hairline bg-panel duration-200 outline-none md:h-[min(776px,calc(100dvh-2rem))] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0">
+        <DialogPrimitive.Popup className="studio-backdrop fixed top-1/2 left-1/2 z-50 flex max-h-[calc(100dvh-2rem)] w-[min(1120px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-hidden rounded-3xl border border-hairline duration-200 outline-none md:h-[min(776px,calc(100dvh-2rem))] data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0">
           <DialogPrimitive.Title className="sr-only">
             {mode === "signup" ? "Sign up" : "Log in"}
           </DialogPrimitive.Title>

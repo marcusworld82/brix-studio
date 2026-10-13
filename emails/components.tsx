@@ -15,15 +15,15 @@ export const EMAIL_COLORS = {
   card: "#131517",
   border: "#23262A",
   text: "#F7F7F8",
-  muted: "#898A8B",
-  lime: "#D1FE17",
-  onLime: "#131517",
+  muted: "#979DAC",
+  lime: "#006494",
+  onLime: "#FFFFFF",
 } as const
 
 const font =
   "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif"
 
-/** Shared dark frame for every Vireo email. */
+/** Shared dark frame for every BRIX email. */
 export function EmailFrame({
   preview,
   brand,

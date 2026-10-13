@@ -6,11 +6,12 @@ import { Resend } from "resend"
 
 import { collections } from "@/lib/db/collections"
 import { env } from "@/lib/env"
+import { UserFacingError } from "@/lib/errors"
 
 /**
- * Transactional email through Resend. Without AUTH_RESEND_KEY outside
- * production, the message is printed to the server log and kept in the
- * dev_mailbox collection (24 h TTL) so E2E tests can follow magic links.
+ * Transactional email through Resend. Real sign-in addresses require a service
+ * key. Reserved .test addresses use the test mailbox when E2E mode is enabled.
+ * Other development messages without a key are printed to the server log.
  */
 let resend: Resend | undefined
 
@@ -27,6 +28,15 @@ export function isE2eAddress(email: string): boolean {
   )
 }
 
+/** Never tell a real user to check an inbox when delivery is disabled. */
+export function requireEmailDelivery(email: string): void {
+  if (!env().AUTH_RESEND_KEY && !isE2eAddress(email))
+    throw new UserFacingError(
+      "Sign-in email is not configured yet. The site owner needs to connect an email service before you can sign in.",
+      "EMAIL_NOT_CONFIGURED"
+    )
+}
+
 export async function sendEmail(input: {
   to: string
   subject: string
@@ -36,6 +46,7 @@ export async function sendEmail(input: {
   devUrl?: string
 }): Promise<void> {
   const value = env()
+  if (input.devUrl) requireEmailDelivery(input.to)
   // E2E runs (local or a preview deploy) read magic links from the test mailbox.
   const capture =
     Boolean(input.devUrl) &&

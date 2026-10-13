@@ -68,7 +68,7 @@ export default async function LoginPage({
 
   return (
     <div className="mx-auto flex w-full max-w-[1152px] px-4 py-8 md:py-12">
-      <div className="flex w-full overflow-hidden rounded-3xl border border-hairline bg-panel md:min-h-[min(720px,calc(100dvh-10rem))]">
+      <div className="studio-backdrop flex w-full overflow-hidden rounded-3xl border border-hairline md:min-h-[min(720px,calc(100dvh-10rem))]">
         <div className="hidden w-1/2 p-3 md:block">
           <AuthShowcase />
         </div>

@@ -3,16 +3,12 @@ import Link from "next/link"
 import { BRAND } from "@/lib/brand"
 import { cn } from "@/lib/utils"
 
-/** Vireo mark: a lime tile with a wing-shaped V. Placeholder wordmark until brand assets arrive. */
+/** BRIX mark: a BRIX blue tile with a white B. Placeholder mark until brand assets arrive. */
 export function LogoMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 32 32" aria-hidden className={cn("size-8", className)}>
-      <rect width="32" height="32" rx="8" fill="#D1FE17" />
-      <path
-        d="M7.5 9.5c2.6 0 4.4 1.3 5.6 3.9L16 19.6l4.3-9.2c.5-1 1.4-1.6 2.5-1.6h1.7L17.6 23.5h-3.2L9.2 12.4c-.4-.9-1-1.4-1.7-1.6V9.5z"
-        fill="#131517"
-      />
-      <circle cx="23.6" cy="8.6" r="1.3" fill="#131517" />
+      <rect width="32" height="32" rx="8" fill="#006494" />
+      <path d="M10 8h7.2c3.1 0 5 1.6 5 4.1 0 1.7-.9 2.9-2.4 3.5 1.9.5 3 1.9 3 3.9 0 2.8-2.2 4.5-5.6 4.5H10V8zm3.4 2.7v3.1h3.4c1.3 0 2-.6 2-1.6s-.7-1.5-2-1.5h-3.4zm0 5.7v3.5h3.8c1.4 0 2.2-.7 2.2-1.8s-.8-1.7-2.2-1.7h-3.8z" fill="#ffffff" fillRule="evenodd"/>
     </svg>
   )
 }

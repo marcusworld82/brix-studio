@@ -10,7 +10,6 @@ import {
   Download,
   FolderClosed,
   FolderPlus,
-  Globe,
   ImageIcon,
   LayoutGrid,
   Loader2,
@@ -120,27 +119,11 @@ export function LibraryView({
       for (const output of run.outputs) await downloadMedia(output.url)
     setBusy(false)
   }
-  const bulkPublish = async () => {
-    setBusy(true)
-    let count = 0
-    for (const run of selectedRuns)
-      if (
-        run.status === "completed" &&
-        !run.isPublic &&
-        (await runs.publish(run.id, true))
-      )
-        count++
-    setBusy(false)
-    toast.success(
-      count ? `Published ${count} to Community` : "Nothing new to publish"
-    )
-  }
-
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2 p-2 md:flex-row md:p-4 md:pt-2">
       <aside
         aria-label="Library navigation"
-        className="flex shrink-0 flex-col gap-4 rounded-[20px] border border-hairline bg-panel p-3 md:w-[240px] md:overflow-y-auto"
+        className="studio-backdrop flex shrink-0 flex-col gap-4 rounded-[20px] border border-hairline p-3 md:w-[240px] md:overflow-y-auto"
       >
         <nav className="flex gap-1 md:flex-col">
           <Link
@@ -316,12 +299,6 @@ export function LibraryView({
               label="Move to project"
               disabled={!selected.size || busy}
               onClick={() => setMoveIds([...selected])}
-            />
-            <BulkButton
-              icon={Globe}
-              label="Publish"
-              disabled={!selected.size || busy}
-              onClick={() => void bulkPublish()}
             />
             <BulkButton
               icon={Trash2}

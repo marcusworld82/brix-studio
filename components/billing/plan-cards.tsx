@@ -147,7 +147,7 @@ export function PlanCard({
             className={cn(
               "font-display rounded px-1.5 py-0.5 text-[11px] italic",
               plan.badge === "MOST POPULAR"
-                ? "bg-lime text-[#131517]"
+                ? "bg-lime text-white"
                 : "bg-[#0256fe] text-white"
             )}
           >

@@ -41,7 +41,7 @@ const COLUMNS: { title: string; links: { label: string; href: string }[] }[] = [
     title: "Company",
     links: [
       { label: "Pricing", href: "/pricing" },
-      { label: "Community", href: "/community" },
+      { label: "Templates", href: "/templates" },
       { label: "Support", href: `mailto:${BRAND.supportEmail}` },
       { label: "Terms", href: "/legal/terms" },
       { label: "Privacy", href: "/legal/privacy" },
@@ -52,10 +52,10 @@ const COLUMNS: { title: string; links: { label: string; href: string }[] }[] = [
 export function Footer() {
   return (
     <footer className="mt-24">
-      <div className="bg-lime px-6 py-14 text-[#131517] md:px-12">
+      <div className="bg-brix-second px-6 py-14 text-white md:px-12">
         <div className="mx-auto grid max-w-[1400px] gap-12 lg:grid-cols-[1.1fr_2fr]">
           <div className="flex flex-col gap-6">
-            <LogoMark className="size-10 [&_circle]:fill-[#D1FE17] [&_path]:fill-[#D1FE17] [&_rect]:fill-[#131517]" />
+            <LogoMark className="size-10 [&_circle]:fill-[#006494] [&_path]:fill-[#006494] [&_rect]:fill-[#ffffff]" />
             <p className="font-display text-4xl leading-[0.95] md:text-5xl">
               Direct every
               <br />
@@ -65,7 +65,7 @@ export function Footer() {
           <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
             {COLUMNS.map((column) => (
               <div key={column.title} className="flex flex-col gap-3">
-                <p className="text-sm font-medium text-[#131517]/70">
+                <p className="text-sm font-medium text-white">
                   {column.title}
                 </p>
                 {column.links.map((link) => (

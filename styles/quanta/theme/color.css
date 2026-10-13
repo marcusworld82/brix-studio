@@ -34,14 +34,14 @@
     --hf-color-brand-green: var(--hf-color-green-500);
     --hf-color-brand-orange: var(--hf-color-orange-400);
     --hf-color-brand-pink: var(--hf-color-pink-500);
-    --hf-color-brand-primary: var(--hf-color-lime-500);
+    --hf-color-brand-primary: var(--hf-color-lime-600);
     --hf-color-brand-red: var(--hf-color-red-700);
     --hf-color-brand-yellow: var(--hf-color-yellow-500);
     --hf-color-brand-yellow-light: var(--hf-color-yellow-300);
 
-    --hf-color-button-brand: var(--hf-color-lime-500);
+    --hf-color-button-brand: var(--hf-color-lime-600);
     --hf-color-button-destructive: var(--hf-color-red-700);
-    --hf-color-button-label-brand: var(--hf-color-grey-550);
+    --hf-color-button-label-brand: #ffffff;
     --hf-color-button-label-destructive: var(--hf-color-grey-050);
     --hf-color-button-primary: var(--hf-color-grey-600);
     --hf-color-button-secondary: var(--hf-color-neutral-100);
@@ -169,14 +169,14 @@
     --hf-color-brand-green: var(--hf-color-green-500);
     --hf-color-brand-orange: var(--hf-color-orange-600);
     --hf-color-brand-pink: var(--hf-color-pink-500);
-    --hf-color-brand-primary: var(--hf-color-lime-500);
+    --hf-color-brand-primary: var(--hf-color-lime-600);
     --hf-color-brand-red: var(--hf-color-red-600);
     --hf-color-brand-yellow: var(--hf-color-yellow-500);
     --hf-color-brand-yellow-light: var(--hf-color-yellow-300);
 
-    --hf-color-button-brand: var(--hf-color-lime-500);
+    --hf-color-button-brand: var(--hf-color-lime-600);
     --hf-color-button-destructive: var(--hf-color-red-600);
-    --hf-color-button-label-brand: var(--hf-color-grey-550);
+    --hf-color-button-label-brand: #ffffff;
     --hf-color-button-label-destructive: var(--hf-color-grey-050);
     --hf-color-button-primary: var(--hf-color-grey-050);
     --hf-color-button-secondary: var(--hf-color-cool-250);

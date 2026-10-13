@@ -105,7 +105,7 @@ export function LoginForm({
             aria-label="I agree to the Terms of Service and Privacy Policy"
             checked={consent}
             onChange={(event) => setConsent(event.target.checked)}
-            className="mt-0.5 size-5 shrink-0 accent-[#d1fe17]"
+            className="mt-0.5 size-5 shrink-0 accent-[#0582ca]"
           />
           <span>
             I agree to the{" "}

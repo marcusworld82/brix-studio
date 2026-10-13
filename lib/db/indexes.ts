@@ -56,6 +56,9 @@ export async function ensureIndexes(database: Db): Promise<string[]> {
   await add("generations.inflight", { status: 1, updatedAt: 1 })
   await add("generations.public", { isPublic: 1, publishedAt: -1 })
 
+  await add("templates.official", { ownerId: 1, active: 1, order: 1 })
+  await add("templates.owner", { ownerId: 1, createdAt: -1 })
+
   await add("projects.user", { userId: 1, updatedAt: -1 })
   await add("uploads.user", { userId: 1, createdAt: -1 })
   await add("uploads.url", { userId: 1, url: 1 })

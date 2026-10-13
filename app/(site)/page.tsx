@@ -11,8 +11,7 @@ import {
 
 import { Atmosphere } from "@/components/marketing/atmosphere"
 import { ModelBadge, ModelGlyph } from "@/components/marketing/badges"
-import { CommunityWall } from "@/components/marketing/community-wall"
-import { loadEffects, loadPublic } from "@/components/marketing/data"
+import { loadEffects } from "@/components/marketing/data"
 import { EmptyCard } from "@/components/marketing/empty-card"
 import { Masonry, MasonryItem } from "@/components/marketing/masonry"
 import { EffectTile, TileMedia } from "@/components/marketing/media-tile"
@@ -20,12 +19,12 @@ import { ScrollRow } from "@/components/marketing/scroll-row"
 import {
   FadeClamp,
   SectionHeader,
-  ViewAllPill,
 } from "@/components/marketing/section-header"
 import { LoopVideo } from "@/components/media/loop-video"
 import { findModel, MODELS } from "@/generation/catalog"
 import type { ModelEntry } from "@/generation/catalog/types"
 import { FAMILY_LOOPS, familyCover, HERO } from "@/lib/showcase"
+import { listOfficialTemplates } from "@/lib/templates"
 
 /** Top-of-page tool cards (§3.2): the models we lead with. */
 const TOOL_IDS = [
@@ -71,9 +70,11 @@ function SurfaceChip({ surface }: { surface: ModelEntry["surface"] }) {
 }
 
 export default async function ExplorePage() {
-  const [effects, community] = await Promise.all([
+  const [effects, templates] = await Promise.all([
     loadEffects(),
-    loadPublic({ limit: 12 }),
+    listOfficialTemplates()
+      .then((items) => items.slice(0, 12))
+      .catch(() => []),
   ])
   const tools = TOOL_IDS.map((id) => findModel(id)).filter(
     (model): model is ModelEntry => Boolean(model)
@@ -292,66 +293,62 @@ export default async function ExplorePage() {
         </ScrollRow>
       </section>
 
-      {/* ── Community ────────────────────────────────────────────────────── */}
+      {/* ── Templates ────────────────────────────────────────────────────── */}
       <section
-        aria-labelledby="community-title"
+        aria-labelledby="templates-title"
         className="mx-auto w-full max-w-[1440px] px-4"
       >
         <SectionHeader
-          id="community-title"
-          title="Community"
-          description="Fresh from creators who chose to publish. Open any piece to see its prompt and recreate it."
+          id="templates-title"
+          title="Templates"
+          description="Premade recipes from BRIX, plus the ones you save. One click loads the model, prompt and settings."
           action={
-            community.items.length > 0 ? (
-              <Link
-                href="/community"
-                className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-white/5 px-4 text-sm font-medium transition-colors hover:bg-white/10"
-              >
-                Explore community{" "}
-                <ArrowUpRight className="size-4" aria-hidden />
-              </Link>
-            ) : null
+            <Link
+              href="/templates"
+              className="inline-flex h-10 items-center gap-1.5 rounded-xl bg-white/5 px-4 text-sm font-medium transition-colors hover:bg-white/10"
+            >
+              Browse templates <ArrowUpRight className="size-4" aria-hidden />
+            </Link>
           }
         />
-        {community.items.length >= 8 ? (
-          <FadeClamp
-            href="/community"
-            label="Explore community"
-            className="max-h-[720px] md:max-h-[900px]"
-          >
-            <CommunityWall items={community.items} columns={4} eagerCount={0} />
-          </FadeClamp>
-        ) : community.items.length > 0 ? (
-          <div className="flex flex-col items-center gap-6">
-            <div className="w-full">
-              <CommunityWall
-                items={community.items}
-                columns={4}
-                eagerCount={0}
-              />
-            </div>
-            <ViewAllPill href="/community">Explore community</ViewAllPill>
-          </div>
+        {templates.length > 0 ? (
+          <ScrollRow label="Templates">
+            {templates.map((template) => (
+              <li
+                key={template.id}
+                className="w-[200px] shrink-0 snap-start md:w-[240px]"
+              >
+                <Link
+                  href="/templates"
+                  className="group relative block aspect-[4/5] overflow-hidden rounded-2xl bg-gradient-to-br from-brix-main/40 via-raised to-page"
+                >
+                  {template.coverUrl ? (
+                    <TileMedia image={template.coverUrl} />
+                  ) : null}
+                  <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-3 pt-10">
+                    <span className="font-display block truncate text-sm text-white">
+                      {template.title}
+                    </span>
+                    <span className="block truncate text-xs text-white/70">
+                      {template.modelLabel}
+                    </span>
+                  </span>
+                </Link>
+              </li>
+            ))}
+          </ScrollRow>
         ) : (
           <EmptyCard
             headingLevel={3}
             icon={<Users className="size-5" aria-hidden />}
-            title={
-              community.failed
-                ? "The community wall is resting"
-                : "The wall is waiting for you"
-            }
-            body={
-              community.failed
-                ? "We couldn't load published work right now. Check back in a minute."
-                : "Nothing has been published yet. Open any finished generation in your library and choose Publish to feature it here."
-            }
+            title="Templates are on their way"
+            body="Premade BRIX templates land here. You can already save your own from the generator."
             action={
               <Link
-                href="/video"
+                href="/templates"
                 className="btn-keycap inline-flex h-10 items-center gap-2 rounded-[10px] px-4 text-sm font-semibold"
               >
-                <Sparkles className="size-4" aria-hidden /> Start creating
+                <Sparkles className="size-4" aria-hidden /> Open templates
               </Link>
             }
           />

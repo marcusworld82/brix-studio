@@ -19,6 +19,8 @@ import type { GeneratorTab, ModelEntry } from "@/generation/catalog/types"
 import { FAMILY_LOOPS, familyCover } from "@/lib/showcase"
 import { cn } from "@/lib/utils"
 
+import { SaveTemplateButton } from "@/components/templates/save-template-button"
+
 import { Badge, ModelIcon, ModelPicker } from "./model-picker"
 import { MediaZone } from "./media-zone"
 import { SettingsRow } from "./setting-tiles"
@@ -289,11 +291,11 @@ export function ControlPanel({ generator }: { generator: Generator }) {
   return (
     <aside
       aria-label="Generation settings"
-      className="flex w-full shrink-0 flex-col overflow-hidden rounded-[20px] border border-hairline bg-panel md:w-[320px]"
+      className="studio-backdrop flex w-full shrink-0 flex-col overflow-hidden rounded-[20px] border border-hairline md:w-[320px]"
     >
       {tabs.length > 1 ? (
         <div
-          className="flex shrink-0 gap-4 border-b border-white/5 px-4"
+          className="flex shrink-0 gap-3 border-b border-white/5 px-3"
           role="tablist"
           aria-label="Mode"
         >
@@ -305,7 +307,7 @@ export function ControlPanel({ generator }: { generator: Generator }) {
               aria-selected={tab === value}
               onClick={() => generator.setTab(value)}
               className={cn(
-                "relative h-11 text-sm font-medium whitespace-nowrap transition-colors",
+                "relative h-11 text-xs font-medium whitespace-nowrap transition-colors sm:text-sm",
                 tab === value
                   ? "text-foreground after:absolute after:inset-x-0 after:bottom-0 after:h-0.5 after:bg-white"
                   : "text-muted-foreground hover:text-foreground"
@@ -342,8 +344,11 @@ export function ControlPanel({ generator }: { generator: Generator }) {
           </p>
         ) : null}
       </div>
-      <div className="sticky bottom-0 shrink-0 border-t border-white/5 bg-panel p-2">
-        <GenerateButton generator={generator} />
+      <div className="sticky bottom-0 flex shrink-0 flex-col gap-2 border-t border-white/5 bg-panel p-2">
+        <SaveTemplateButton generator={generator} variant="panel" />
+        <div className="hidden md:block">
+          <GenerateButton generator={generator} />
+        </div>
       </div>
     </aside>
   )

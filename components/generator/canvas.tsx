@@ -169,7 +169,7 @@ export function Canvas({
     <section
       aria-label="Results"
       className={cn(
-        "relative flex min-h-[60vh] min-w-0 flex-1 flex-col overflow-hidden rounded-[20px] border border-white/10 md:min-h-0",
+        "studio-backdrop relative flex min-h-[60vh] min-w-0 shrink-0 flex-1 flex-col overflow-hidden rounded-[20px] border border-white/10 md:min-h-0 md:shrink",
         className
       )}
     >

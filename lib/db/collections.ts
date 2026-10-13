@@ -219,6 +219,29 @@ export interface PresetDoc {
   updatedAt: Date
 }
 
+/**
+ * A reusable recipe (model + prompt + settings). `ownerId` is null for the
+ * premade BRIX templates the admin uploads, and the author's id for templates
+ * a user saved from their own work.
+ */
+export interface TemplateDoc {
+  _id: ObjectId
+  ownerId: ObjectId | null
+  title: string
+  description: string
+  surface: Surface
+  modelId: string
+  prompt: string
+  settings: Record<string, unknown>
+  coverUrl?: string
+  coverVideoUrl?: string
+  category: string
+  order: number
+  active: boolean
+  createdAt: Date
+  updatedAt: Date
+}
+
 export interface ModelPricingDoc {
   _id: ObjectId
   modelId: string
@@ -269,6 +292,7 @@ export async function collections() {
     hfWebhookEvents:
       database.collection<HfWebhookEventDoc>("hf_webhook_events"),
     presets: database.collection<PresetDoc>("presets"),
+    templates: database.collection<TemplateDoc>("templates"),
     modelPricing: database.collection<ModelPricingDoc>("model_pricing"),
     rateLimits: database.collection<RateLimitDoc>("rate_limits"),
     reports: database.collection<ReportDoc>("reports"),

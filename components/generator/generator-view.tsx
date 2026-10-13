@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react"
 import { ChevronRight, Wand2 } from "lucide-react"
 
 import { PromptBox } from "@/components/studio/prompt-box"
+import { SaveTemplateButton } from "@/components/templates/save-template-button"
 import { StudioPromptBox } from "@/components/studio/studio-prompt-box"
 import type { Surface } from "@/generation/catalog/types"
 import type { PresetView } from "@/lib/presets"
@@ -42,11 +43,13 @@ export function GeneratorView({
 
 function PanelLayout({ generator }: { generator: Generator }) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2 md:flex-row md:overflow-hidden md:p-4 md:pt-2">
-      <ControlPanel generator={generator} />
-      <Canvas generator={generator} />
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2 md:flex-row md:overflow-hidden md:p-4 md:pt-2">
+        <ControlPanel generator={generator} />
+        <Canvas generator={generator} />
+      </div>
       {/* Mobile: keep Generate reachable at the bottom of the screen. */}
-      <div className="sticky bottom-0 z-20 -mx-2 border-t border-white/5 bg-page/95 p-3 backdrop-blur md:hidden">
+      <div className="z-20 shrink-0 border-t border-white/5 bg-page/95 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur md:hidden">
         <GenerateButton generator={generator} />
       </div>
     </div>
@@ -148,6 +151,7 @@ function ImageLayout({ generator }: { generator: Generator }) {
                     Enhance
                   </PromptBox.Pill>
                 ) : null}
+                <SaveTemplateButton generator={generator} variant="pill" />
                 {generator.preset ? (
                   <PromptBox.Pill
                     onClick={generator.clearPreset}

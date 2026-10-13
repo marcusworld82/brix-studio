@@ -35,9 +35,9 @@ export function navLinks(): NavLink[] {
       match: (path) => path.startsWith("/effects"),
     },
     {
-      href: "/community",
-      label: "Community",
-      match: (path) => path.startsWith("/community") || path.startsWith("/g/"),
+      href: "/templates",
+      label: "Templates",
+      match: (path) => path.startsWith("/templates"),
     },
     {
       href: "/pricing",

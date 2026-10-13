@@ -32,7 +32,7 @@ import { navLinks } from "./nav-links"
 
 /**
  * The site header: logo · Explore · Image · Video · (Audio) · Effects ·
- * Community · Pricing, then the credit pill, Upgrade and the avatar menu
+ * Templates · Pricing, then the credit pill, Upgrade and the avatar menu
  * (or Login / Sign up). `compact` is the 36 px app-page variant.
  */
 export function TopNav({ compact = false }: { compact?: boolean }) {
@@ -143,6 +143,17 @@ function AccountControls({ compact }: { compact: boolean }) {
         <Gem className="size-3.5" aria-hidden /> Upgrade
       </button>
       <UserMenu />
+      {user.role === "admin" ? (
+        <Link
+          href="/admin"
+          className={cn(
+            "hidden items-center gap-1.5 rounded-[10px] bg-white/5 px-3 text-sm font-medium hover:bg-white/10 sm:flex",
+            height
+          )}
+        >
+          <Shield className="size-4" aria-hidden /> Admin
+        </Link>
+      ) : null}
     </>
   )
 }
@@ -253,6 +264,15 @@ function MobileSheet({
                 >
                   Account
                 </Link>
+                {user.role === "admin" ? (
+                  <Link
+                    href="/admin"
+                    onClick={close}
+                    className="flex items-center gap-2 rounded-xl px-3 py-3 text-base font-medium hover:bg-white/5"
+                  >
+                    <Shield className="size-4" aria-hidden /> Admin
+                  </Link>
+                ) : null}
               </>
             ) : null}
           </nav>

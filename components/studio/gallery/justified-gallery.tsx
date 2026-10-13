@@ -171,7 +171,7 @@ export function JustifiedGallery({
                         className={cn(
                           "absolute top-2 left-2 flex size-6 items-center justify-center rounded-full border",
                           selected
-                            ? "border-lime bg-lime text-[#131517]"
+                            ? "border-lime bg-lime text-white"
                             : "border-white/40 bg-black/40 text-transparent"
                         )}
                       >

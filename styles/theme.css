@@ -22,8 +22,8 @@
     --secondary: var(--hf-color-transparent-light-05);
     --secondary-foreground: var(--hf-color-text-primary);
     --muted: var(--hf-color-transparent-light-05);
-    /* A touch brighter than Quanta's #828282 so secondary text passes 4.5:1 on cards. */
-    --muted-foreground: #9a9b9d;
+    /* BRIX third color; passes 4.5:1 on cards. */
+    --muted-foreground: #979dac;
     --accent: var(--hf-color-overlay-hover);
     --accent-foreground: var(--hf-color-text-primary);
     --destructive: var(--hf-color-state-error-fg);

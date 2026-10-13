@@ -144,7 +144,7 @@ export function GenerationDetailModal({
               <div className="flex items-center justify-between gap-2">
                 {generation.author ? (
                   <div className="flex items-center gap-2">
-                    <span className="flex size-8 items-center justify-center overflow-hidden rounded-full bg-lime text-sm font-semibold text-[#131517]">
+                    <span className="flex size-8 items-center justify-center overflow-hidden rounded-full bg-lime text-sm font-semibold text-white">
                       {generation.author.image ? (
                         <img
                           src={generation.author.image}
@@ -251,7 +251,7 @@ export function GenerationDetailModal({
                     type="button"
                     onClick={() => {
                       action.onSelect?.()
-                      if (action.id !== "publish") setOpen(false)
+                      setOpen(false)
                     }}
                     className={cn(
                       "flex h-10 items-center justify-center gap-1.5 rounded-[10px] text-sm font-medium transition-colors",

@@ -1,6 +1,6 @@
-# Vireo — AI image & video studio
+# BRIX — AI image & video studio
 
-Vireo is a production-grade studio for generating images and video with every
+BRIX is a production-grade studio for generating images and video with every
 model the [Higgsfield REST API](https://docs.higgsfield.ai) exposes: Seedance,
 Kling, Wan, Soul, Cinema Studio, Genjutsu, MiniMax, LTX, PixVerse, Grok,
 Recraft, Qwen, Ideogram and more — **47 picker entries covering 81 documented
@@ -46,8 +46,10 @@ pnpm db:init --admin=you@example.com   # indexes + Effects presets (+ admin role
 For offline development set in `.env.local`:
 `MONGODB_URI=mongodb://127.0.0.1:27027/?replicaSet=vireo`,
 `HF_API_BASE_URL=http://localhost:4010`, `HF_CREDENTIALS=mock:mock`,
-`SIGNUP_BONUS_CREDITS=200`, `E2E_TEST_MODE=true`. Magic links are printed to the
-dev-server log (no Resend key needed); media is stored under `.data/media`; the
+`SIGNUP_BONUS_CREDITS=200`, `E2E_TEST_MODE=true`. Use reserved `.test` email
+addresses and the test mailbox for local sign-in without Resend. Real inboxes
+require `AUTH_RESEND_KEY` and a verified `EMAIL_FROM`; the form reports missing
+configuration instead of claiming an email was sent. Media is stored under `.data/media`; the
 reconciler runs in-process every 5 s because there is no cron or webhook tunnel.
 
 ## Real services
@@ -144,6 +146,10 @@ Key files: `lib/generations/{submit,finalize,reconcile,cancel}.ts`,
 
 See `docs/runbook.md` for operations, `docs/decisions.md` for every default and
 docs-vs-template disagreement, and `docs/model-catalog.md` for the model table.
+
+The owner signs in with an address listed in `ADMIN_EMAILS`, then uses the
+**Admin** link in the header, account menu, or mobile menu. `/admin` sends
+signed-out visitors to login and returns 404 for signed-in non-admins.
 
 The Studio UI is adapted from `higgsfield-ai/app-templates` (no LICENSE file
 as of 2026-09-26 — re-check before launch; see `docs/decisions.md`).

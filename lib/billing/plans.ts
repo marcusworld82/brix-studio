@@ -41,7 +41,7 @@ export const PLANS: Record<PlanId, Plan> = {
     features: [
       { label: "Every image and video model", included: true },
       { label: "Personal library and projects", included: true },
-      { label: "Publish to Community", included: true },
+      { label: "Save your own templates", included: true },
       { label: "Parallel generations", included: false },
       { label: "Commercial use", included: false },
     ],

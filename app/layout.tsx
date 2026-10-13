@@ -105,7 +105,7 @@ export default async function RootLayout({
       <body className="min-h-dvh bg-page text-foreground">
         <a
           href="#main"
-          className="sr-only z-[100] rounded-lg bg-lime px-3 py-2 text-[#131517] focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
+          className="sr-only z-[100] rounded-lg bg-lime px-3 py-2 text-white focus:not-sr-only focus:fixed focus:top-2 focus:left-2"
         >
           Skip to content
         </a>

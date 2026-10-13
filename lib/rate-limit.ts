@@ -56,5 +56,6 @@ export const LIMITS = {
   submitPerUser: { limit: 20, window: 60 },
   uploadPerUser: { limit: 60, window: 60 * 10 },
   statusPerUser: { limit: 120, window: 60 },
+  templatePerUser: { limit: 30, window: 60 * 60 },
   reportPerUser: { limit: 10, window: 60 * 60 },
 } as const

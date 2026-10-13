@@ -10,10 +10,12 @@ import {
   adjustCreditsAction,
   clearBillingFlagAction,
   deletePresetAction,
+  deleteTemplateAdminAction,
   moderateAction,
   setModelEnabledAction,
   setPriceOverrideAction,
   upsertPresetAction,
+  upsertTemplateAction,
 } from "@/app/actions/admin"
 import { ConfirmDialog } from "@/components/generator/tile-actions"
 import { useToast } from "@/components/providers/app-providers"
@@ -34,7 +36,9 @@ import type {
   ModerationItem,
 } from "@/lib/admin"
 import type { PriceRule } from "@/lib/billing/pricing-types"
+import { uploadMedia } from "@/generation/upload"
 import type { PresetView } from "@/lib/presets"
+import type { TemplateView } from "@/lib/templates"
 import { cn } from "@/lib/utils"
 
 const input =
@@ -864,7 +868,7 @@ export function AdminPresets({
                       type="checkbox"
                       checked={form.active}
                       onChange={(event) => set("active", event.target.checked)}
-                      className="accent-[#d1fe17]"
+                      className="accent-[#0582ca]"
                     />
                     Visible in the gallery
                   </label>
@@ -930,6 +934,309 @@ export function AdminPresets({
         onConfirm={async () => {
           if (!removing) return
           const result = await deletePresetAction(removing.id)
+          setRemoving(null)
+          if (!result.ok) return toast.error("Couldn't delete", result.error)
+          router.refresh()
+        }}
+      />
+    </section>
+  )
+}
+
+/* ── Templates (premade, uploaded by the admin) ───────────────────────── */
+
+type TemplateForm = {
+  id?: string
+  title: string
+  description: string
+  surface: "image" | "video" | "audio"
+  modelId: string
+  prompt: string
+  settings: string
+  coverUrl: string
+  coverVideoUrl: string
+  category: string
+  order: string
+  active: boolean
+}
+
+function toTemplateForm(template?: TemplateView): TemplateForm {
+  return {
+    ...(template ? { id: template.id } : {}),
+    title: template?.title ?? "",
+    description: template?.description ?? "",
+    surface: template?.surface ?? "image",
+    modelId: template?.modelId ?? "soul-2",
+    prompt: template?.prompt ?? "",
+    settings: JSON.stringify(template?.settings ?? {}),
+    coverUrl: template?.coverUrl ?? "",
+    coverVideoUrl: template?.coverVideoUrl ?? "",
+    category: template?.category ?? "General",
+    order: "100",
+    active: template?.active ?? true,
+  }
+}
+
+export function AdminTemplates({
+  templates,
+  models,
+}: {
+  templates: TemplateView[]
+  models: { id: string; label: string; surface: string }[]
+}) {
+  const router = useRouter()
+  const toast = useToast()
+  const [form, setForm] = useState<TemplateForm | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [removing, setRemoving] = useState<TemplateView | null>(null)
+  const set = <K extends keyof TemplateForm>(key: K, value: TemplateForm[K]) =>
+    setForm((current) => (current ? { ...current, [key]: value } : current))
+  return (
+    <section className="flex flex-col gap-4">
+      <Button className="self-start" onClick={() => setForm(toTemplateForm())}>
+        <Plus /> New template
+      </Button>
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {templates.map((template) => (
+          <div
+            key={template.id}
+            className="overflow-hidden rounded-2xl bg-surface"
+          >
+            {template.coverUrl ? (
+              <img
+                src={template.coverUrl}
+                alt=""
+                className="aspect-[4/5] w-full object-cover"
+              />
+            ) : (
+              <div className="flex aspect-[4/5] w-full items-center justify-center bg-raised p-4 text-center text-xs text-muted-foreground">
+                No cover
+              </div>
+            )}
+            <div className="flex items-center gap-2 p-3">
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium">{template.title}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {template.modelLabel} · {template.category}{" "}
+                  {template.active ? "" : "· hidden"}
+                </p>
+              </div>
+              <button
+                type="button"
+                aria-label={`Edit ${template.title}`}
+                onClick={() => setForm(toTemplateForm(template))}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <Pencil className="size-4" />
+              </button>
+              <button
+                type="button"
+                aria-label={`Delete ${template.title}`}
+                onClick={() => setRemoving(template)}
+                className="text-[#ff6b6b]"
+              >
+                <Trash2 className="size-4" />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+      {templates.length === 0 ? (
+        <p className="rounded-2xl bg-surface p-6 text-sm text-muted-foreground">
+          No premade templates yet. Create one and it shows on the Templates
+          page for everyone.
+        </p>
+      ) : null}
+      <Dialog
+        open={form !== null}
+        onOpenChange={(open) => !open && setForm(null)}
+      >
+        <DialogContent size="md">
+          {form ? (
+            <form
+              onSubmit={async (event) => {
+                event.preventDefault()
+                setError(null)
+                let settings: Record<string, unknown>
+                try {
+                  settings = JSON.parse(form.settings || "{}") as Record<
+                    string,
+                    unknown
+                  >
+                } catch {
+                  return setError("Settings must be valid JSON.")
+                }
+                const result = await upsertTemplateAction(
+                  {
+                    title: form.title,
+                    description: form.description,
+                    surface: form.surface,
+                    modelId: form.modelId,
+                    prompt: form.prompt,
+                    settings,
+                    ...(form.coverUrl ? { coverUrl: form.coverUrl } : {}),
+                    ...(form.coverVideoUrl
+                      ? { coverVideoUrl: form.coverVideoUrl }
+                      : {}),
+                    category: form.category,
+                    order: Number(form.order),
+                    active: form.active,
+                  },
+                  form.id
+                )
+                if (!result.ok) return setError(result.error)
+                setForm(null)
+                toast.success("Template saved")
+                router.refresh()
+              }}
+            >
+              <DialogHeader>
+                <DialogTitle>
+                  {form.id ? "Edit template" : "New template"}
+                </DialogTitle>
+                <DialogDescription>
+                  The full prompt, model and settings load into the generator
+                  when someone clicks Use template.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogBody>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {(
+                    [
+                      ["title", "Title"],
+                      ["category", "Category"],
+                      ["order", "Order"],
+                      ["description", "Short note (optional)"],
+                    ] as const
+                  ).map(([key, label]) => (
+                    <label key={key} className="flex flex-col gap-1 text-sm">
+                      {label}
+                      <input
+                        value={form[key]}
+                        onChange={(event) => set(key, event.target.value)}
+                        className={input}
+                      />
+                    </label>
+                  ))}
+                  <label className="flex flex-col gap-1 text-sm">
+                    Model
+                    <select
+                      value={form.modelId}
+                      onChange={(event) => {
+                        const model = models.find(
+                          (m) => m.id === event.target.value
+                        )
+                        set("modelId", event.target.value)
+                        if (model)
+                          set(
+                            "surface",
+                            model.surface as TemplateForm["surface"]
+                          )
+                      }}
+                      className={input}
+                    >
+                      {models.map((model) => (
+                        <option key={model.id} value={model.id}>
+                          {model.label} ({model.surface})
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="flex items-center gap-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={form.active}
+                      onChange={(event) => set("active", event.target.checked)}
+                      className="accent-[#0582ca]"
+                    />
+                    Visible on the Templates page
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm sm:col-span-2">
+                    Cover image (upload or paste a URL)
+                    <input
+                      type="file"
+                      accept="image/*"
+                      disabled={uploading}
+                      onChange={async (event) => {
+                        const file = event.target.files?.[0]
+                        if (!file) return
+                        setUploading(true)
+                        setError(null)
+                        try {
+                          const upload = await uploadMedia(file)
+                          set("coverUrl", upload.url)
+                        } catch (caught) {
+                          setError(
+                            caught instanceof Error
+                              ? caught.message
+                              : "Upload failed."
+                          )
+                        } finally {
+                          setUploading(false)
+                        }
+                      }}
+                      className="text-xs text-muted-foreground"
+                    />
+                    <input
+                      value={form.coverUrl}
+                      placeholder="https://… or /media/…"
+                      onChange={(event) => set("coverUrl", event.target.value)}
+                      className={input}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm sm:col-span-2">
+                    Prompt
+                    <textarea
+                      value={form.prompt}
+                      onChange={(event) => set("prompt", event.target.value)}
+                      rows={4}
+                      className={cn(input, "h-auto py-2")}
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1 text-sm sm:col-span-2">
+                    Settings (JSON, catalog keys)
+                    <input
+                      value={form.settings}
+                      onChange={(event) => set("settings", event.target.value)}
+                      className={cn(input, "font-mono")}
+                    />
+                  </label>
+                  {error ? (
+                    <p
+                      role="alert"
+                      className="text-sm text-[#ff6b6b] sm:col-span-2"
+                    >
+                      {error}
+                    </p>
+                  ) : null}
+                </div>
+              </DialogBody>
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => setForm(null)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={uploading}>
+                  Save
+                </Button>
+              </DialogFooter>
+            </form>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+      <ConfirmDialog
+        open={removing !== null}
+        title={`Delete “${removing?.title}”?`}
+        description="It disappears from the Templates page for everyone."
+        confirmLabel="Delete"
+        onCancel={() => setRemoving(null)}
+        onConfirm={async () => {
+          if (!removing) return
+          const result = await deleteTemplateAdminAction(removing.id)
           setRemoving(null)
           if (!result.ok) return toast.error("Couldn't delete", result.error)
           router.refresh()

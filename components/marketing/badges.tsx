@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils"
 
 const TONES = {
   pink: "bg-pink-strong text-white",
-  lime: "bg-lime text-[#131517]",
+  lime: "bg-lime text-white",
   blue: "bg-gradient-to-r from-[#4fc9dc] via-[#32a2ee] to-[#167bff] text-white",
   muted: "bg-white/10 text-white",
 } as const

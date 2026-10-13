@@ -90,7 +90,7 @@ export function magicLinkText({
 
 MagicLinkEmail.PreviewProps = {
   url: "https://vireo.studio/api/auth/callback/resend?token=preview",
-  brand: "Vireo",
+  brand: "BRIX",
   host: "vireo.studio",
   expiresInMinutes: 60,
   supportEmail: "support@vireo.studio",

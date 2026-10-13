@@ -66,8 +66,7 @@ export async function publishGenerationAction(
   return runAction(async () => {
     const user = await requireUser()
     const view = await setPublished(user.objectId, id, isPublic)
-    revalidatePath("/community")
-    return view
+        return view
   })
 }
 

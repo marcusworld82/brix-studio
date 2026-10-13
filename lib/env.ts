@@ -29,7 +29,7 @@ const schema = z.object({
 
   AUTH_SECRET: optionalString,
   AUTH_RESEND_KEY: optionalString,
-  EMAIL_FROM: z.string().default("Vireo <login@vireo.studio>"),
+  EMAIL_FROM: z.string().default("BRIX <login@vireo.studio>"),
   SUPPORT_EMAIL: z.email().default("support@vireo.studio"),
   SIGNUP_BONUS_CREDITS: z.coerce.number().int().min(0).default(0),
   /** Comma-separated emails that get the admin role. */
