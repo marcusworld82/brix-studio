@@ -13,6 +13,7 @@ import { getBalance } from "@/lib/account"
 import { currentUser } from "@/lib/auth/session"
 import { isSupabaseBackend } from "@/lib/backend"
 import { connectionStatus } from "@/lib/supabase/connections"
+import { env } from "@/lib/env"
 import { BRAND } from "@/lib/brand"
 import { clientPricing, type ClientPricing } from "@/lib/billing/pricing"
 import { cn } from "@/lib/utils"
@@ -38,14 +39,14 @@ const plexMono = IBM_Plex_Mono({
 })
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.APP_URL ?? BRAND.productionUrl),
+  metadataBase: new URL(env().APP_URL),
   title: {
-    default: `${BRAND.name} — AI image & video studio`,
+    default: `${BRAND.name}, AI image & video studio`,
     template: `%s · ${BRAND.name}`,
   },
   description: BRAND.description,
   openGraph: {
-    title: `${BRAND.name} — AI image & video studio`,
+    title: `${BRAND.name}, AI image & video studio`,
     description: BRAND.description,
     images: ["/media/hero/coast.jpg"],
     type: "website",
