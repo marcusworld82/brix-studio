@@ -68,3 +68,6 @@ Do not publish this as a working user-key studio until credential isolation and 
 
 ## Password accounts
 New signup uses Supabase signup link generation with a password, mailed through Resend. Verification uses an isolated client and redirects to login without setting a browser session. Verified users log in with email and password. Existing passwordless users set a password through Forgot password. Recovery tokens authorize only password updates in an isolated auth client. Successful reset returns to login. Old BRIX magic-link routes and actions no longer sign in Supabase users. Profiles, admin roles, API connections, and media ownership are preserved.
+
+## Complete copied API key
+BRIX collects one complete copied Higgsfield API key in a password field. Users do not split or assemble credentials. The server stores the entire value encrypted and sends `Authorization: Key <complete copied key>` unchanged. Existing combined credentials remain compatible. Saving a key configures it; validity and provider access are checked during actual API operations, not asserted just from saving.

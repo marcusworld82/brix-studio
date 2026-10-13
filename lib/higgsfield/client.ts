@@ -4,6 +4,7 @@ import {
   parseUploadTicket,
   requireUploadContentType,
 } from "@/generation/upload-contract"
+import { isCompleteApiKey } from "./api-key"
 import { env } from "@/lib/env"
 
 import type {
@@ -90,8 +91,8 @@ export function createHiggsfieldClient(options: ClientOptions) {
   const timeoutMs = options.timeoutMs ?? 20_000
   const sleep =
     options.sleep ?? ((ms: number) => new Promise((r) => setTimeout(r, ms)))
-  if (!/^[^:\s]+:[^:\s]+$/.test(options.credentials))
-    throw new Error("HF_CREDENTIALS must be key_id:key_secret")
+  if (!isCompleteApiKey(options.credentials))
+    throw new Error("Enter the complete Higgsfield API key.")
   const authorization = `Key ${options.credentials}`
 
   async function once(

@@ -1,5 +1,6 @@
 import "server-only"
 
+import { isCompleteApiKey } from "@/lib/higgsfield/api-key"
 import { z } from "zod"
 
 /**
@@ -60,8 +61,8 @@ const schema = z.object({
 
   HF_API_BASE_URL: z.url().default("https://api.higgsfield.ai"),
   HF_CREDENTIALS: optionalString.refine(
-    (value) => value === undefined || /^[^:\s]+:[^:\s]+$/.test(value),
-    "HF_CREDENTIALS must be key_id:key_secret"
+    (value) => value === undefined || isCompleteApiKey(value),
+    "HF_CREDENTIALS must be the complete copied Higgsfield API key"
   ),
   HF_WEBHOOK_SECRET: optionalString,
   HF_WEBHOOK_BASE_URL: optionalString,

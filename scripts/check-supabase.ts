@@ -95,14 +95,14 @@ try {
   if (!process.env.BRIX_CHECK_URL) {
     await get("/account")
     const denied = await action("saveApiConnectionAction", [
-      { keyId: "test-key-id", keySecret: "test-key-secret", userId: users[1] },
+      { apiKey: "test-complete-api-key", userId: users[1] },
     ])
     assert(denied.includes('"ok":false'))
     const connected = await action("saveApiConnectionAction", [
-      { keyId: "test-key-id", keySecret: "test-key-secret" },
+      { apiKey: "test-complete-api-key" },
     ])
     assert(connected.includes('"ok":true'))
-    assert(!connected.includes("test-key-secret"))
+    assert(!connected.includes("test-complete-api-key"))
   }
   const saved = await (await get("/api/me")).json()
   assert.equal(saved.connection.connected, true)

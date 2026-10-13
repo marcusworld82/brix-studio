@@ -1,5 +1,6 @@
 import "server-only"
 
+import { isCompleteApiKey } from "@/lib/higgsfield/api-key"
 import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto"
 
 /** A dedicated server secret, not a publishable Supabase key. */
@@ -17,8 +18,8 @@ export function encryptCredentials(
   ownerId: string,
   secret: string
 ): string {
-  if (!ownerId || !/^[^:\s]+:[^:\s]+$/.test(credentials))
-    throw new Error("An owner and Higgsfield key ID and secret are required.")
+  if (!ownerId || !isCompleteApiKey(credentials))
+    throw new Error("An owner and complete Higgsfield API key are required.")
   const iv = randomBytes(12)
   const cipher = createCipheriv("aes-256-gcm", encryptionKey(secret), iv)
   cipher.setAAD(Buffer.from(`brix:higgsfield:v1:${ownerId}`))

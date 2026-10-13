@@ -9,8 +9,7 @@ import {
 
 export function ApiKeyForm({ label, next }: { label?: string; next?: string }) {
   const router = useRouter()
-  const [keyId, setKeyId] = useState("")
-  const [keySecret, setKeySecret] = useState("")
+  const [apiKey, setApiKey] = useState("")
   const [pending, setPending] = useState(false)
   const [message, setMessage] = useState("")
   const submit = async (event: FormEvent) => {
@@ -18,14 +17,13 @@ export function ApiKeyForm({ label, next }: { label?: string; next?: string }) {
     if (pending) return
     setPending(true)
     setMessage("")
-    const result = await saveApiConnectionAction({ keyId, keySecret })
+    const result = await saveApiConnectionAction({ apiKey })
     setPending(false)
-    setKeySecret("")
+    setApiKey("")
     if (!result.ok) {
       setMessage(result.error)
       return
     }
-    setKeyId("")
     setMessage("API key saved. Higgsfield validates it when you generate.")
     router.refresh()
     if (next && next !== "/") router.push(next)
@@ -52,37 +50,30 @@ export function ApiKeyForm({ label, next }: { label?: string; next?: string }) {
       )}
       <form onSubmit={submit} className="flex flex-col gap-4">
         <label className="flex flex-col gap-2 text-sm">
-          API key ID
+          API key
           <input
-            name="keyId"
-            value={keyId}
-            onChange={(e) => setKeyId(e.target.value)}
-            autoComplete="off"
-            required
-            className="h-12 rounded-xl border border-white/10 bg-surface px-4"
-          />
-        </label>
-        <label className="flex flex-col gap-2 text-sm">
-          API key secret
-          <input
-            name="keySecret"
+            name="apiKey"
             type="password"
-            value={keySecret}
-            onChange={(e) => setKeySecret(e.target.value)}
-            autoComplete="new-password"
+            value={apiKey}
+            onChange={(e) => setApiKey(e.target.value)}
+            autoComplete="off"
+            autoCapitalize="none"
+            spellCheck={false}
             required
+            maxLength={4096}
+            placeholder="Paste your complete Higgsfield API key"
             className="h-12 rounded-xl border border-white/10 bg-surface px-4"
           />
         </label>
         <p className="text-xs text-muted-foreground">
-          Find both values in your Higgsfield API console. Keys are encrypted on
-          the server and never displayed back to you.
+          Paste the API key copied from open.higgsfield.ai as-is. Your key is
+          encrypted on the server and never displayed back to you.
         </p>
         <button
-          disabled={pending || !keyId || !keySecret}
+          disabled={pending || !apiKey.trim()}
           className="btn-keycap h-12 rounded-xl font-semibold"
         >
-          {pending ? "Saving…" : label ? "Replace API key" : "Save API key"}
+          {pending ? "Saving…" : label ? "Replace API key" : "Connect API key"}
         </button>
       </form>
       {label ? (

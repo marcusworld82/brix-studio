@@ -1,6 +1,7 @@
 "use server"
 
 import { runAction } from "@/lib/action-result"
+import { isCompleteApiKey, MAX_API_KEY_LENGTH } from "@/lib/higgsfield/api-key"
 import { z } from "zod"
 import {
   connectionStatus,
@@ -16,25 +17,22 @@ export async function getApiConnectionAction() {
 
 const inputSchema = z
   .object({
-    keyId: z
+    apiKey: z
       .string()
       .trim()
-      .min(1)
-      .max(128)
-      .regex(/^[^:\s]+$/),
-    keySecret: z
-      .string()
-      .trim()
-      .min(1)
-      .max(256)
-      .regex(/^[^:\s]+$/),
+      .min(1, "Paste your Higgsfield API key.")
+      .max(MAX_API_KEY_LENGTH)
+      .refine(
+        isCompleteApiKey,
+        "Paste the complete API key value without spaces or an Authorization header."
+      ),
   })
   .strict()
 
 export async function saveApiConnectionAction(input: unknown) {
   return runAction(async () => {
     const value = inputSchema.parse(input)
-    await saveConnection(value.keyId, value.keySecret)
+    await saveConnection(value.apiKey)
     return connectionStatus()
   })
 }

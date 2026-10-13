@@ -1,6 +1,7 @@
 import "server-only"
 
 import { UnauthorizedError, UserFacingError } from "@/lib/errors"
+import { isCompleteApiKey } from "@/lib/higgsfield/api-key"
 import { createHiggsfieldClient } from "@/lib/higgsfield/client"
 
 import { decryptCredentials, encryptCredentials } from "./credential-cipher"
@@ -37,19 +38,13 @@ export async function connectionStatus() {
     : { connected: false }
 }
 
-export async function saveConnection(
-  keyId: string,
-  keySecret: string
-): Promise<void> {
+export async function saveConnection(apiKey: string): Promise<void> {
   const { user } = await signedInUser()
-  const credentials = `${keyId.trim()}:${keySecret.trim()}`
-  if (
-    !keyId.trim() ||
-    !keySecret.trim() ||
-    credentials.length > 512 ||
-    !/^[^:\s]+:[^:\s]+$/.test(credentials)
-  )
-    throw new UserFacingError("Enter your Higgsfield API key ID and secret.")
+  const credentials = apiKey.trim()
+  if (!isCompleteApiKey(credentials))
+    throw new UserFacingError(
+      "Paste the complete API key copied from Higgsfield."
+    )
   const ciphertext = encryptCredentials(credentials, user.id, cipherSecret())
   // No generation is submitted merely to save a key. Provider authentication
   // is checked when the first real operation is requested.
@@ -58,7 +53,7 @@ export async function saveConnection(
     {
       target_user_id: user.id,
       ciphertext,
-      masked_label: `•••• ${keyId.trim().slice(-4)}`,
+      masked_label: `•••• ${credentials.slice(-4)}`,
     }
   )
   if (error)
