@@ -38,7 +38,7 @@ function AuthModalInner() {
           <div className="hidden w-1/2 p-3 md:block">
             <AuthShowcase />
           </div>
-          <div className="relative flex flex-1 items-center justify-center overflow-y-auto p-8 md:p-14">
+          <div className="relative flex flex-1 items-center-safe justify-center overflow-y-auto p-8 md:p-14">
             <DialogPrimitive.Close
               aria-label="Close"
               className="absolute top-4 right-4 flex size-8 items-center justify-center rounded-full bg-white/5 hover:bg-white/10"

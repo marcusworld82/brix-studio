@@ -162,9 +162,9 @@ function MagicLinkForm({
 
 export function LoginForm(props: Parameters<typeof MagicLinkForm>[0]) {
   const { pricing } = useApp()
-  return pricing.mode === "api-key" ? (
-    <PasswordLoginForm {...props} />
-  ) : (
+  return pricing.mode === "credits" ? (
     <MagicLinkForm {...props} />
+  ) : (
+    <PasswordLoginForm {...props} />
   )
 }

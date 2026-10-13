@@ -93,6 +93,7 @@ export async function clientPricing(): Promise<ClientPricing> {
     if (price !== null) fromPrices[model.id] = price
   }
   return {
+    mode: "credits",
     table: context.credits,
     disabled: [...context.disabled],
     fromPrices,

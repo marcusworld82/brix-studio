@@ -1,6 +1,8 @@
 "use client"
 
 import Link from "next/link"
+import { usePathname } from "next/navigation"
+import { useApp } from "@/components/providers/app-providers"
 import { useEffect, useState } from "react"
 
 import { useLocalFlag } from "@/lib/studio/local-flag"
@@ -43,6 +45,9 @@ export function hasConsent(kind: "analytics" | "marketing"): boolean {
 }
 
 export function CookieConsent() {
+  const { auth } = useApp()
+  const pathname = usePathname()
+  const authPage = pathname === "/login" || pathname.startsWith("/login/")
   const [stored, setStored, hydrated] = useLocalFlag(KEY)
   const [preferences, setPreferences] = useState(false)
   const [analytics, setAnalytics] = useState(false)
@@ -63,7 +68,7 @@ export function CookieConsent() {
 
   return (
     <>
-      {visible && !preferences ? (
+      {visible && !preferences && !auth.open && !authPage ? (
         <div
           role="dialog"
           aria-label="Cookie notice"
@@ -106,7 +111,7 @@ export function CookieConsent() {
           </div>
         </div>
       ) : null}
-      <Dialog open={preferences} onOpenChange={setPreferences}>
+      <Dialog open={preferences && !auth.open} onOpenChange={setPreferences}>
         <DialogContent size="sm">
           <DialogHeader>
             <DialogTitle>Cookie preferences</DialogTitle>
