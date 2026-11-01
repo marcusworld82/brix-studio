@@ -87,11 +87,16 @@ const candidates = new Set([
 ])
 const forbidden =
   /(^|\/)(?:\.git|\.vercel|\.next|\.data|node_modules|uploads?|privateuploads|private|credentials?|secrets?|fixtures?|__fixtures__|screenshots?|test-results|playwright-report|coverage|_research|_reference)(?:\/|$)/i
+// These are application source handlers, not folders containing uploaded media.
+const uploadHandlers = new Set([
+  "app/api/upload/route.ts",
+  "app/api/uploads/route.ts",
+])
 function allowed(path) {
   if (
     path.includes("\\") ||
     path.split("/").some((segment) => ["..", "."].includes(segment)) ||
-    forbidden.test(path)
+    (forbidden.test(path) && !uploadHandlers.has(path))
   )
     return false
   if (examples.includes(path)) return true
@@ -124,7 +129,7 @@ for (const required of [...roots]
       "tsconfig.json",
     ].includes(path)
   )
-  .concat(examples, [...docs])) {
+  .concat(examples, [...docs], [...uploadHandlers])) {
   if (!paths.includes(required))
     throw new Error(`Required release file missing: ${required}`)
 }
