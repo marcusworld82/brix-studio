@@ -22,6 +22,7 @@ import { findModel, MODELS } from "@/generation/catalog"
 import type { ModelEntry } from "@/generation/catalog/types"
 import { FAMILY_LOOPS, familyCover, HERO } from "@/lib/showcase"
 import { listOfficialTemplates } from "@/lib/templates"
+import { isSubscriptionEdition } from "@/lib/edition"
 import { isSupabaseBackend } from "@/lib/backend"
 
 /** Top-of-page tool cards (§3.2): the models we lead with. */
@@ -110,8 +111,10 @@ export default async function ExplorePage() {
             <span className="text-lime">Skip the set.</span>
           </h1>
           <p className="max-w-[560px] text-base text-white/80 [text-shadow:0_1px_14px_rgba(0,0,0,0.7)] md:text-lg">
-            {isSupabaseBackend() ? (
-              "Create images and video with your own Higgsfield API key. Generations use your API balance."
+            {isSubscriptionEdition() ? (
+              "Create images and video with BRIX studio credits. Choose a plan to get started."
+            ) : isSupabaseBackend() ? (
+              "Create images and video with your own Higgsfield or OpenRouter API key. Each provider bills your API account."
             ) : (
               <>
                 Turn a sentence or a single frame into cinematic video and
