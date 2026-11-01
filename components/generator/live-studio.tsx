@@ -320,8 +320,10 @@ export function LiveStudio({ surface }: { surface: Surface }) {
     ...runs.records.flatMap(runToLibraryItems),
   ]
   const patch = (key: string, value: unknown, promptOverride?: string) => {
+    const disablingShots = key === "multi_shots" && value === false
     if (current) {
       const prospective = { ...values, [key]: value }
+      if (disablingShots) delete prospective.multi_prompt
       const nextSchema = effectiveLiveSchema(current, prospective)
       const nextProperties = record(nextSchema.properties)
         ? nextSchema.properties
@@ -333,6 +335,7 @@ export function LiveStudio({ surface }: { surface: Surface }) {
           nextProperties,
           old
         )
+        if (disablingShots) delete next.multi_prompt
         return Object.keys(next).length === Object.keys(old).length ? old : next
       })
     }
@@ -350,6 +353,7 @@ export function LiveStudio({ surface }: { surface: Surface }) {
           )
       if (value === undefined) delete next[key]
       else next[key] = value
+      if (disablingShots) delete next.multi_prompt
       if (
         key === "multi_prompt" &&
         record(properties.multi_shots) &&
