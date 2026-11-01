@@ -218,7 +218,7 @@ try {
       const relative = path.replace(`${name}/`, "").replace(/\/$/, "")
       if (!relative || (!relative.includes(".") && path.endsWith("/"))) continue
       if (
-        forbidden.test(relative) ||
+        (forbidden.test(relative) && !uploadHandlers.has(relative)) ||
         (relative.includes(".env") &&
           ![".env.example", ...examples].includes(relative))
       )
