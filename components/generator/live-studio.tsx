@@ -257,7 +257,8 @@ export function LiveStudio({ surface }: { surface: Surface }) {
       : user?.apiKeyConnected)
   const price = useApiPrice(
     input,
-    !!connected &&
+    !!user &&
+      !!connected &&
       !!current &&
       !current.stale &&
       !Object.keys(invalid).length &&
