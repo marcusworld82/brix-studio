@@ -140,7 +140,11 @@ function AccountControls({ compact }: { compact: boolean }) {
             height
           )}
         >
-          {user.apiKeyConnected ? "Balance unavailable" : "Connect API key"}
+          {user.apiKeyConnected
+            ? "Balance unavailable"
+            : user.openRouterConnected
+              ? "API accounts"
+              : "Connect API key"}
         </Link>
         <UserMenu />
         {user.role === "admin" ? (

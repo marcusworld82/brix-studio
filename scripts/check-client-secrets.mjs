@@ -17,6 +17,7 @@ if (!existsSync(STATIC)) {
 }
 
 const PATTERNS = [
+  /sk-or-v1-[0-9a-zA-Z]{16,}/, // OpenRouter server keys
   /sk_(live|test)_[0-9a-zA-Z]{10,}/, // Stripe secret keys
   /whsec_[0-9a-zA-Z]{10,}/, // Stripe webhook secrets
   /rk_(live|test)_[0-9a-zA-Z]{10,}/, // Stripe restricted keys
@@ -26,6 +27,7 @@ const PATTERNS = [
 ]
 // Exact values of server env vars, when set in this build's environment.
 const SECRET_ENV = [
+  "OPENROUTER_API_KEY",
   "AUTH_SECRET",
   "AUTH_RESEND_KEY",
   "HF_CREDENTIALS",

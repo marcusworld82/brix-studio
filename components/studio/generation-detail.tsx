@@ -10,6 +10,7 @@ import type { TileAction } from "@/components/studio/gallery/gallery-types"
 import { settingLabel } from "@/components/studio/settings-dialog"
 import { Button } from "@/components/ui/button"
 import { downloadMedia } from "@/lib/studio/download-media"
+import { formatUsd } from "@/lib/billing/usd"
 import { cn } from "@/lib/utils"
 
 /**
@@ -28,6 +29,8 @@ export interface GenerationDetail {
   settings?: Record<string, unknown>
   /** Credits this generation cost (net of refunds). */
   cost?: number
+  apiCostUsd?: number
+  apiCostEstimated?: boolean
   author?: { name: string; image?: string }
 }
 
@@ -59,6 +62,12 @@ function defaultRows(g: GenerationDetail): GenerationDetailRow[] {
   }
   if (typeof g.cost === "number")
     rows.push({ id: "cost", label: "Cost", value: `✦ ${g.cost}` })
+  if (typeof g.apiCostUsd === "number")
+    rows.push({
+      id: "api-usd",
+      label: g.apiCostEstimated ? "Estimated API cost" : "Actual API cost",
+      value: formatUsd(g.apiCostUsd),
+    })
   if (g.createdAt)
     rows.push({
       id: "created",

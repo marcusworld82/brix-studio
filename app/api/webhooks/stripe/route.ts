@@ -1,3 +1,4 @@
+import { handleSubscriptionStripeEvent } from "@/lib/supabase/subscription-billing"
 import { stripe } from "@/lib/billing/stripe"
 import { handleStripeEvent } from "@/lib/billing/stripe-events"
 import { env } from "@/lib/env"
@@ -8,7 +9,8 @@ export const runtime = "nodejs"
 
 /** Stripe webhook: raw body + signature check, idempotent handlers. */
 export async function POST(request: Request) {
-  if (isSupabaseBackend()) return json({ error: "Not found" }, 404)
+  if (isSupabaseBackend() && process.env.BRIX_EDITION !== "subscription")
+    return json({ error: "Not found" }, 404)
   const secret = env().STRIPE_WEBHOOK_SECRET
   if (!secret) return json({ error: "Stripe webhooks are not configured" }, 503)
   const signature = request.headers.get("stripe-signature")
@@ -21,7 +23,9 @@ export async function POST(request: Request) {
     return json({ error: "Invalid signature" }, 400)
   }
   try {
-    const result = await handleStripeEvent(event)
+    const result = await (isSupabaseBackend()
+      ? handleSubscriptionStripeEvent(event)
+      : handleStripeEvent(event))
     return json({ received: true, result })
   } catch (error) {
     // 500 makes Stripe retry; handlers are idempotent.

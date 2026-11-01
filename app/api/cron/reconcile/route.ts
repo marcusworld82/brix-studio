@@ -1,3 +1,6 @@
+import { isSubscriptionEdition } from "@/lib/edition"
+import { reconcileCreditSettlements } from "@/lib/supabase/settlements"
+import { refillSubscriptionAllowances } from "@/lib/supabase/subscription-billing"
 import { timingSafeEqual } from "node:crypto"
 
 import { env } from "@/lib/env"
@@ -20,6 +23,14 @@ function authorized(request: Request): boolean {
 /** Vercel Cron (every minute) sends `Authorization: Bearer $CRON_SECRET`. */
 export async function GET(request: Request) {
   if (!authorized(request)) return json({ error: "Unauthorized" }, 401)
+  if (isSupabaseBackend()) {
+    try {
+      await refillSubscriptionAllowances()
+      await reconcileCreditSettlements()
+    } catch (error) {
+      if (isSubscriptionEdition()) throw error
+    }
+  }
   return json(
     await (isSupabaseBackend() ? reconcileUserGenerations() : reconcile())
   )

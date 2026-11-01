@@ -43,8 +43,14 @@ export async function generationView(
   const outputs = z.array(outputSchema).parse(row.outputs)
   const media = z.array(inputSchema).parse(row.input_media)
   return {
-    billingSource: "higgsfield-api",
+    billingSource:
+      row.billing_source === "subscription"
+        ? "subscription"
+        : row.provider === "openrouter"
+          ? "openrouter-api"
+          : "higgsfield-api",
     apiCostEstimate: row.provider_cost_estimate,
+    apiCostActual: row.provider_actual_cost ?? null,
     id: row.id,
     surface: z.enum(["image", "video", "audio"]).parse(row.surface),
     modelId: row.model_id,
@@ -62,8 +68,8 @@ export async function generationView(
       }))
     ),
     status: z.enum(states).parse(row.status),
-    cost: 0,
-    refunded: 0,
+    cost: row.credit_cost ?? 0,
+    refunded: row.refunded_credits ?? 0,
     outputs: await Promise.all(
       outputs.map(async (o) => ({
         kind: o.kind,

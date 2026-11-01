@@ -298,7 +298,18 @@ function GalleryTileComponent({
           createdAt: item.createdAt,
           settings: item.settings,
           ...(item.generation &&
-          item.generation.billingSource !== "higgsfield-api"
+          item.generation.billingSource !== "subscription" &&
+          (item.generation.apiCostActual ?? item.generation.apiCostEstimate) !=
+            null
+            ? {
+                apiCostUsd: (item.generation.apiCostActual ??
+                  item.generation.apiCostEstimate)!,
+                apiCostEstimated: item.generation.apiCostActual == null,
+              }
+            : {}),
+          ...(item.generation &&
+          item.generation.billingSource !== "higgsfield-api" &&
+          item.generation.billingSource !== "openrouter-api"
             ? { cost: item.generation.cost - item.generation.refunded }
             : {}),
         }}

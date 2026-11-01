@@ -8,6 +8,8 @@ import { TopupGrid } from "@/components/billing/plan-cards"
 import { getAccount } from "@/lib/account"
 import { currentUser } from "@/lib/auth/session"
 import { PLANS } from "@/lib/billing/plans"
+import { isSubscriptionEdition } from "@/lib/edition"
+import { subscriptionBalance } from "@/lib/supabase/subscription-billing"
 import { isSupabaseBackend } from "@/lib/backend"
 
 export const metadata: Metadata = { title: "Billing" }
@@ -17,9 +19,35 @@ export default async function BillingPage({
 }: {
   searchParams: Promise<{ checkout?: string }>
 }) {
-  if (isSupabaseBackend()) redirect("/account")
+  if (isSupabaseBackend() && !isSubscriptionEdition()) redirect("/account")
   const user = await currentUser()
   if (!user) redirect("/login?callbackUrl=/account/billing")
+  if (isSupabaseBackend()) {
+    const balance = await subscriptionBalance(user.id).catch(() => null)
+    return (
+      <div className="flex flex-col gap-6">
+        <h1 className="font-display text-4xl">Billing</h1>
+        <p>
+          {balance
+            ? balance.plan +
+              " plan · " +
+              balance.total.toLocaleString() +
+              " credits"
+            : "Credit account setup pending"}
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Your plan and credit balance update after payment is verified. Manage
+          payment methods, invoices and cancellations through Stripe.
+        </p>
+        <div className="flex gap-3">
+          <Link href="/pricing" className="btn-keycap rounded-xl px-5 py-3">
+            Compare plans
+          </Link>
+          <PortalButton />
+        </div>
+      </div>
+    )
+  }
   const [account, { checkout }] = await Promise.all([
     getAccount(user.objectId),
     searchParams,

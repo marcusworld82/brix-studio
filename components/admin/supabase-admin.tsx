@@ -1,4 +1,8 @@
 import Link from "next/link"
+import { isSubscriptionEdition } from "@/lib/edition"
+import { SubscriptionPricingSettings } from "./subscription-pricing-settings"
+import { ProviderKeyForm } from "@/components/account/provider-key-form"
+import { platformConnectionStatus } from "@/lib/supabase/platform-connections"
 import { AdminPresets, AdminTemplates } from "./admin-panels"
 import { MODELS } from "@/generation/catalog"
 import { listPresets } from "@/lib/presets"
@@ -9,11 +13,14 @@ export async function SupabaseAdmin({
 }: {
   params: Record<string, string | undefined>
 }) {
-  const tab = ["users", "generations", "presets", "templates"].includes(
-    params.tab ?? ""
-  )
-    ? params.tab
-    : "users"
+  const tabs = [
+    "users",
+    "generations",
+    "presets",
+    "templates",
+    ...(isSubscriptionEdition() ? ["pricing", "providers"] : []),
+  ]
+  const tab = tabs.includes(params.tab ?? "") ? params.tab : "users"
   const models = MODELS.map((m) => ({
     id: m.id,
     label: m.label,
@@ -40,8 +47,11 @@ export async function SupabaseAdmin({
   return (
     <div className="flex flex-col gap-6">
       <h1 className="font-display text-4xl">Admin</h1>
-      <nav className="flex gap-4" aria-label="Admin sections">
-        {["users", "generations", "presets", "templates"].map((t) => (
+      <nav
+        className="flex max-w-full gap-4 overflow-x-auto pb-2"
+        aria-label="Admin sections"
+      >
+        {tabs.map((t) => (
           <Link
             key={t}
             href={`/admin?tab=${t}`}
@@ -52,6 +62,43 @@ export async function SupabaseAdmin({
           </Link>
         ))}
       </nav>
+      {tab === "pricing" ? <SubscriptionPricingSettings /> : null}
+      {tab === "providers"
+        ? await (async () => {
+            const [hf, or] = await Promise.all([
+              platformConnectionStatus("higgsfield").catch(() => ({
+                connected: false,
+                label: undefined,
+                unavailable: true,
+              })),
+              platformConnectionStatus("openrouter").catch(() => ({
+                connected: false,
+                label: undefined,
+                unavailable: true,
+              })),
+            ])
+            return (
+              <div className="flex flex-col gap-6">
+                <ProviderKeyForm
+                  platform
+                  provider="higgsfield"
+                  unavailable={"unavailable" in hf && hf.unavailable === true}
+                  label={
+                    hf.connected ? hf.label || "Configured securely" : undefined
+                  }
+                />
+                <ProviderKeyForm
+                  platform
+                  provider="openrouter"
+                  unavailable={"unavailable" in or && or.unavailable === true}
+                  label={
+                    or.connected ? or.label || "Configured securely" : undefined
+                  }
+                />
+              </div>
+            )
+          })()
+        : null}
       {tab === "users" ? (
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">

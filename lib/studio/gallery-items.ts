@@ -48,7 +48,8 @@ export function runToGalleryItems(run: GenerationView): GalleryItem[] {
                 run.status) as GalleryItem["failureKind"],
               failureLabel:
                 run.error ??
-                (run.billingSource === "higgsfield-api"
+                (run.billingSource === "higgsfield-api" ||
+                run.billingSource === "openrouter-api"
                   ? "Higgsfield could not finish this generation. Check your API account for billing details."
                   : (FAILURE_LABEL[run.status] ??
                     "The generation failed. Credits refunded.")),

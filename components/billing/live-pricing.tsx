@@ -1,7 +1,7 @@
 "use client"
 import Link from "next/link"
 import { useEffect, useState } from "react"
-import { RefreshCw, ArrowUpRight } from "lucide-react"
+import { RefreshCw } from "lucide-react"
 import type { LiveCatalog } from "@/generation/catalog/live-types"
 import { formatUsd } from "@/lib/billing/usd"
 function display(amount: unknown) {
@@ -61,14 +61,6 @@ export function LivePricing() {
           >
             Open your studio
           </Link>
-          <a
-            href="https://open.higgsfield.ai/pricing"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 px-3 text-sm text-white/60"
-          >
-            Provider pricing <ArrowUpRight className="size-4" />
-          </a>
         </div>
       </header>
       <section className="overflow-hidden rounded-2xl border border-white/10 bg-black/15">

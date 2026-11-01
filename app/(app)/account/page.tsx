@@ -9,6 +9,11 @@ import { currentUser } from "@/lib/auth/session"
 import { isSupabaseBackend } from "@/lib/backend"
 import { connectionStatus } from "@/lib/supabase/connections"
 import { safeReturnPath } from "@/lib/supabase/auth"
+import { isSubscriptionEdition } from "@/lib/edition"
+import { subscriptionBalance } from "@/lib/supabase/subscription-billing"
+import { connectionStatus as openRouterStatus } from "@/lib/supabase/openrouter-connections"
+import { ProviderKeyForm } from "@/components/account/provider-key-form"
+import { PortalButton } from "@/components/account/portal-button"
 import { ApiKeyForm } from "@/components/account/api-key-form"
 
 export const metadata: Metadata = { title: "Account" }
@@ -21,7 +26,41 @@ export default async function AccountPage({
   const user = await currentUser()
   if (!user) redirect("/login?callbackUrl=/account")
   if (isSupabaseBackend()) {
-    const status = await connectionStatus()
+    if (isSubscriptionEdition()) {
+      const balance = await subscriptionBalance(user.id).catch(() => null)
+      return (
+        <div className="flex flex-col gap-6">
+          <header>
+            <h1 className="font-display text-4xl">Account</h1>
+            <p className="mt-2 text-muted-foreground">{user.email}</p>
+          </header>
+          <section className="rounded-2xl border border-white/10 bg-surface p-6">
+            <h2 className="text-lg">Your credits</h2>
+            <p className="mt-3 font-mono text-4xl">
+              {balance ? balance.total.toLocaleString() : "Setup pending"}
+            </p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Plan: {balance?.plan ?? "not connected"}. Generations use studio
+              credits. You do not need a provider API key.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Link href="/pricing" className="btn-keycap rounded-xl px-5 py-3">
+                Compare plans
+              </Link>
+              <PortalButton />
+            </div>
+          </section>
+        </div>
+      )
+    }
+    const [status, openRouter] = await Promise.all([
+      connectionStatus(),
+      openRouterStatus().catch(() => ({
+        connected: false,
+        label: undefined,
+        unavailable: true,
+      })),
+    ])
     return (
       <div className="flex flex-col gap-6">
         <header>
@@ -32,9 +71,15 @@ export default async function AccountPage({
           label={status.connected ? status.label : undefined}
           next={safeReturnPath((await searchParams).next)}
         />
+        <ProviderKeyForm
+          unavailable={
+            "unavailable" in openRouter && openRouter.unavailable === true
+          }
+          label={openRouter.connected ? openRouter.label : undefined}
+        />
         <p className="text-sm text-muted-foreground">
-          BRIX does not debit studio generation credits in this setup.
-          Higgsfield bills your API account.
+          BRIX does not debit studio generation credits in this setup. Each
+          provider bills your connected API account.
         </p>
       </div>
     )

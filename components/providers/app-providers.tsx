@@ -18,6 +18,7 @@ import { Toaster, useToast } from "./toaster"
 /* ── Session ───────────────────────────────────────────────────────────── */
 
 export type ClientUser = {
+  openRouterConnected?: boolean
   apiKeyConnected?: boolean
   apiConnectionVersion?: string
   id: string

@@ -45,6 +45,12 @@ import { toGenerationView } from "./serialize"
 import type { GenerationView } from "./view"
 
 export const submitSchema = z.object({
+  expectedCredits: z.number().int().nonnegative().optional(),
+  acceptVariablePrice: z.boolean().optional(),
+  expectedPriceFingerprint: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .optional(),
   expectedUsd: z.number().finite().nonnegative().optional(),
   submitKey: z.uuid({ message: "Invalid submission." }),
   modelId: z.string().min(1).max(220),

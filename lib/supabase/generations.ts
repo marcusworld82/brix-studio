@@ -1,4 +1,22 @@
 import "server-only"
+import { createHash } from "node:crypto"
+import type { SupabaseClient } from "@supabase/supabase-js"
+import { isSubscriptionEdition } from "@/lib/edition"
+import { quoteOpenRouterInput } from "@/lib/openrouter/catalog"
+import {
+  OpenRouterError,
+  AmbiguousOpenRouterError,
+} from "@/lib/openrouter/client"
+import { clientForOpenRouter } from "./openrouter-connections"
+import {
+  platformHiggsfieldClient,
+  platformOpenRouterClient,
+} from "./platform-connections"
+import {
+  quoteSubscriptionCost,
+  startSubscriptionGeneration,
+  settleSubscriptionGeneration,
+} from "./subscription-billing"
 import { prepareLiveUserGeneration } from "./live-input"
 import { quoteGenerationCost } from "./generation-cost"
 import { z } from "zod"
@@ -39,7 +57,7 @@ export async function prepareUserGeneration(
   userId: string,
   input: ReturnType<typeof submitSchema.parse>
 ) {
-  if (input.modelId.startsWith("hf:"))
+  if (input.modelId.startsWith("hf:") || input.modelId.startsWith("or:"))
     return prepareLiveUserGeneration(userId, input)
   const client = createSupabaseServiceClient()
   const model = findModel(input.modelId)
@@ -78,141 +96,335 @@ export async function prepareUserGeneration(
   return { model, media, plane, request }
 }
 
+type Prepared = Awaited<ReturnType<typeof prepareUserGeneration>>
+type Input = ReturnType<typeof submitSchema.parse>
+async function requestQuote(userId: string, input: Input, prepared: Prepared) {
+  if (input.modelId.startsWith("or:")) {
+    return quoteOpenRouterInput(input.modelId, prepared.request.body)
+  }
+  const connection = isSubscriptionEdition()
+    ? await platformHiggsfieldClient()
+    : await clientForConnection(userId)
+  return quoteGenerationCost(
+    userId,
+    connection.client,
+    prepared.request,
+    prepared.media
+  )
+}
+function usagePriceFingerprint(input: Input, result: unknown) {
+  return createHash("sha256")
+    .update(
+      JSON.stringify({
+        model: input.modelId,
+        settings: input.settings,
+        prompt: input.prompt,
+        quote: result,
+      })
+    )
+    .digest("hex")
+}
 export async function estimateUserGeneration(userId: string, raw: unknown) {
   const input = submitSchema.parse(raw)
-  await enforceRateLimit(`estimate:${userId}`, 120, 60)
-  const { request, media } = await prepareUserGeneration(userId, input)
-  const connection = await clientForConnection(userId)
+  await enforceRateLimit("estimate:" + userId, 120, 60)
+  const prepared = await prepareUserGeneration(userId, input)
   try {
-    const result = await quoteGenerationCost(
-      userId,
-      connection.client,
-      request,
-      media
-    )
-    return result
-      ? {
-          status: "ready" as const,
-          ...result,
-          currency: "USD" as const,
-          quotedAt: Date.now(),
-        }
-      : {
-          status: "variable" as const,
-          usd: null,
-          currency: "USD" as const,
-          description:
-            "Higgsfield cannot price these inputs yet. Check the model inputs or use another model.",
-        }
+    const result = await requestQuote(userId, input, prepared)
+    if (isSubscriptionEdition()) {
+      const retail = await quoteSubscriptionCost(
+        userId,
+        input.modelId,
+        result?.usd ?? null
+      )
+      return {
+        status: "ready" as const,
+        ...result,
+        usd: retail.usd,
+        credits: retail.credits,
+        estimated: false,
+        currency: "USD",
+        explanation:
+          "Studio credits for this generation, including the configured studio fee.",
+        quotedAt: Date.now(),
+      }
+    }
+    if (result?.usd != null)
+      return {
+        status: "ready" as const,
+        ...result,
+        currency: "USD",
+        quotedAt: Date.now(),
+      }
+    return {
+      status: "variable" as const,
+      allowUsagePrice: input.modelId.startsWith("or:"),
+      priceFingerprint: input.modelId.startsWith("or:")
+        ? usagePriceFingerprint(input, result)
+        : undefined,
+      usd: null,
+      currency: "USD",
+      description:
+        result?.explanation ??
+        "A reliable price is unavailable for these inputs. Adjust the settings or use another model.",
+      rates: result && "pricing" in result ? result.pricing : undefined,
+    }
   } catch (caught) {
-    throw new UserFacingError(providerMessage(caught))
+    if (caught instanceof UserFacingError) throw caught
+    throw new UserFacingError(
+      caught instanceof OpenRouterError
+        ? caught.message
+        : providerMessage(caught)
+    )
   }
 }
-
 export async function submitUserGeneration(userId: string, raw: unknown) {
   const input = submitSchema.parse(raw)
-  await enforceRateLimit(`submit:${userId}`, 20, 60)
-  const client = createSupabaseServiceClient()
-  const { data: existing } = await client
+  await enforceRateLimit("submit:" + userId, 20, 60)
+  const service = createSupabaseServiceClient()
+  const { data: existing } = await service
     .from("brix_generations")
     .select()
     .eq("user_id", userId)
     .eq("submit_key", input.submitKey)
     .maybeSingle()
   if (existing) return generationView(existing)
-  const { model, media, plane, request } = await prepareUserGeneration(
-    userId,
-    input
-  )
-  const connection = await clientForConnection(userId)
-  let estimate: number | null = null
-  try {
-    const quote = await quoteGenerationCost(
-      userId,
-      connection.client,
-      request,
-      media
-    )
-    estimate = quote?.usd ?? null
-  } catch (caught) {
-    throw new UserFacingError(providerMessage(caught))
-  }
-  if (estimate === null)
+  const prepared = await prepareUserGeneration(userId, input)
+  const { model, media, plane, request } = prepared
+  const openRouter = input.modelId.startsWith("or:")
+  const subscription = isSubscriptionEdition()
+  const providerQuote = await requestQuote(userId, input, prepared)
+  const providerUsd = providerQuote?.usd ?? null
+  const retail = subscription
+    ? await quoteSubscriptionCost(userId, input.modelId, providerUsd)
+    : null
+  const shownUsd = retail?.usd ?? providerUsd
+  const usageAccepted =
+    !subscription &&
+    openRouter &&
+    shownUsd === null &&
+    input.acceptVariablePrice === true
+  if (shownUsd === null && !usageAccepted)
     throw new UserFacingError(
-      "Higgsfield cannot provide a fixed dollar price for this configuration.",
+      "A reliable generation price is unavailable for these inputs.",
       "PRICE_UNAVAILABLE"
     )
   if (
-    input.expectedUsd === undefined ||
-    Math.abs(input.expectedUsd - estimate) > 0.0000001
+    usageAccepted &&
+    input.expectedPriceFingerprint !==
+      usagePriceFingerprint(input, providerQuote)
   )
     throw new UserFacingError(
-      "The price changed. Wait for the updated price, then press Generate again.",
+      "The provider rates changed. Review the updated usage pricing.",
+      "PRICE_CHANGED"
+    )
+  if (
+    !usageAccepted &&
+    (shownUsd === null ||
+      input.expectedUsd === undefined ||
+      Math.abs(input.expectedUsd - shownUsd) > 0.0000001 ||
+      (retail && input.expectedCredits !== retail.credits))
+  )
+    throw new UserFacingError(
+      "The price changed. Wait for the new quote and generate again.",
       "PRICE_CHANGED"
     )
   const ratio = String(plane.settings.aspectRatio ?? "1:1")
     .split(":")
     .map(Number)
-  const { data, error } = await client.rpc("brix_start_generation", {
-    target_user_id: userId,
-    target_connection_id: connection.connectionId,
-    job: jsonValue({
-      submit_key: input.submitKey,
-      project_id: input.projectId ? uuid(input.projectId) : null,
-      surface: model.surface,
-      model_id: model.id,
-      model_label: model.label,
-      model_path: request.path,
-      prompt: plane.prompt.text,
-      settings: plane.settings,
-      input_media: media.map((m) => ({
-        role: m.role,
-        kind: m.kind,
-        path: m.path,
-        ...(m.name ? { name: m.name } : {}),
-      })),
-      provider_cost_estimate: estimate,
-      aspect: ratio[0] && ratio[1] ? ratio[0] / ratio[1] : 1,
-      preset_id: input.presetId ?? null,
-    }),
-    request_body: jsonValue(request.body),
-  })
-  if (error)
-    throw new UserFacingError(
-      "Couldn't queue this generation. Check your connection or wait for active work to finish."
+  const job = {
+    submit_key: input.submitKey,
+    project_id: input.projectId ? uuid(input.projectId) : null,
+    surface: model.surface,
+    model_id: model.id,
+    model_label: model.label,
+    model_path: request.path,
+    prompt: plane.prompt.text,
+    settings: plane.settings,
+    input_media: media.map((m) => ({
+      role: m.role,
+      kind: m.kind,
+      path: m.path,
+      ...(m.name ? { name: m.name } : {}),
+    })),
+    provider_cost_estimate: providerUsd,
+    aspect: ratio[0] && ratio[1] ? ratio[0] / ratio[1] : 1,
+    preset_id: input.presetId ?? null,
+    provider: openRouter ? "openrouter" : "higgsfield",
+  }
+  const hf = !openRouter
+    ? subscription
+      ? await platformHiggsfieldClient()
+      : await clientForConnection(userId)
+    : null
+  const or = openRouter
+    ? subscription
+      ? await platformOpenRouterClient()
+      : await clientForOpenRouter(userId)
+    : null
+  let queued: { id: string; created: boolean }
+  if (subscription && retail)
+    queued = await startSubscriptionGeneration(
+      userId,
+      job,
+      request.body,
+      retail
     )
-  const queued = z.object({ id: z.uuid(), created: z.boolean() }).parse(data)
+  else if (openRouter && or) {
+    const client = service as unknown as SupabaseClient
+    const { data, error } = await client.rpc(
+      "brix_start_openrouter_generation",
+      {
+        target_user_id: userId,
+        target_connection_id: or.connectionId,
+        job: jsonValue(job),
+        request_body: jsonValue(request.body),
+      }
+    )
+    if (error)
+      throw new UserFacingError(
+        "Couldn't queue this image. Check your connection and active jobs."
+      )
+    queued = z.object({ id: z.uuid(), created: z.boolean() }).parse(data)
+  } else {
+    const { data, error } = await service.rpc("brix_start_generation", {
+      target_user_id: userId,
+      target_connection_id: hf!.connectionId!,
+      job: jsonValue(job),
+      request_body: jsonValue(request.body),
+    })
+    if (error)
+      throw new UserFacingError(
+        "Couldn't queue this generation. Check your connection and active jobs."
+      )
+    queued = z.object({ id: z.uuid(), created: z.boolean() }).parse(data)
+  }
   if (!queued.created)
     return generationView(await ownGeneration(userId, queued.id))
+  let providerStarted = false
+  let providerCompleted = false
   try {
-    const result = await connection.client.submit(
-      request.path,
-      request.body,
-      webhookUrlFor(queued.id)
-    )
-    const { error: saved } = await client
-      .from("brix_generations")
-      .update({
-        provider_request_id: result.requestId,
-        status: result.status === "in_progress" ? "in_progress" : "queued",
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", queued.id)
-      .eq("user_id", userId)
-    if (saved) throw new AmbiguousSubmitError(saved)
+    if (subscription) {
+      const pinned = (openRouter ? or : hf)?.connectionId
+      if (pinned) {
+        const saved = await service
+          .from("brix_generations")
+          .update({ platform_connection_id: pinned })
+          .eq("id", queued.id)
+          .eq("user_id", userId)
+        if (saved.error)
+          throw new UserFacingError(
+            "Couldn't secure the provider connection. No generation was submitted."
+          )
+      }
+    }
+    if (openRouter && or) {
+      providerStarted = true
+      const result = await or.client.generateImage(input.modelId, request.body)
+      const outputs = []
+      for (const [index, file] of result.images.entries()) {
+        const extension =
+          file.contentType === "image/png"
+            ? "png"
+            : file.contentType === "image/jpeg"
+              ? "jpg"
+              : "webp"
+        const path =
+          userId + "/outputs/" + queued.id + "/" + index + "." + extension
+        const stored = await service.storage
+          .from(MEDIA_BUCKET)
+          .upload(path, file.bytes, {
+            contentType: file.contentType,
+            upsert: false,
+          })
+        if (stored.error)
+          throw new AmbiguousOpenRouterError(null, result.requestId)
+        outputs.push({ kind: "image", path })
+      }
+      const saved = await service
+        .from("brix_generations")
+        .update({
+          provider_request_id: result.requestId,
+          status: "completed",
+          outputs: jsonValue(outputs),
+          provider_actual_cost: result.actualCostUsd,
+          finished_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", queued.id)
+        .eq("user_id", userId)
+      if (saved.error)
+        throw new AmbiguousOpenRouterError(null, result.requestId)
+      providerCompleted = true
+      if (subscription)
+        await settleSubscriptionGeneration(queued.id, "complete")
+    } else {
+      providerStarted = true
+      const result = await hf!.client.submit(
+        request.path,
+        request.body,
+        webhookUrlFor(queued.id)
+      )
+      const saved = await service
+        .from("brix_generations")
+        .update({
+          provider_request_id: result.requestId,
+          status: result.status === "in_progress" ? "in_progress" : "queued",
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", queued.id)
+        .eq("user_id", userId)
+      if (saved.error) throw new AmbiguousSubmitError(saved.error)
+    }
   } catch (caught) {
-    if (!(caught instanceof AmbiguousSubmitError))
-      await client
+    if (providerCompleted) {
+      await service
+        .from("brix_generations")
+        .update({
+          error:
+            "Your image is complete. Credit settlement will be reconciled.",
+          error_kind: "billing_pending",
+        })
+        .eq("id", queued.id)
+        .eq("user_id", userId)
+      return generationView(await ownGeneration(userId, queued.id))
+    }
+    const uncertain =
+      caught instanceof AmbiguousSubmitError ||
+      caught instanceof AmbiguousOpenRouterError
+    if (uncertain) {
+      await service
+        .from("brix_generations")
+        .update({
+          error:
+            "The provider may have processed this request. It needs review before another submission. Check the provider usage history.",
+          error_kind: "provider_review",
+          ...(caught instanceof AmbiguousOpenRouterError && caught.requestId
+            ? { provider_request_id: caught.requestId }
+            : {}),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", queued.id)
+        .eq("user_id", userId)
+    } else {
+      const saved = await service
         .from("brix_generations")
         .update({
           status: "failed",
-          error: providerMessage(caught),
+          error:
+            caught instanceof OpenRouterError
+              ? caught.message
+              : providerStarted
+                ? providerMessage(caught)
+                : "No request was submitted. Try again later.",
           error_kind: "submit",
           finished_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
         .eq("id", queued.id)
         .eq("user_id", userId)
+      if (subscription && !saved.error)
+        await settleSubscriptionGeneration(queued.id, "failed")
+    }
   }
   return generationView(await ownGeneration(userId, queued.id))
 }
@@ -225,6 +437,14 @@ export async function finalizeUserGeneration(id: string) {
   if (error) throw new Error("Couldn't claim generation refresh.")
   const row = data?.[0]
   if (!row) return
+  if (row.provider === "openrouter") {
+    await client
+      .from("brix_generations")
+      .update({ finalize_lease_until: null, finalize_lease_token: null })
+      .eq("id", row.id)
+      .eq("finalize_lease_token", row.finalize_lease_token!)
+    return
+  }
   const commit = async (
     values: Partial<import("./database").Tables<"brix_generations">>
   ) => {
@@ -242,6 +462,10 @@ export async function finalizeUserGeneration(id: string) {
   }
   try {
     if (!row.provider_request_id) {
+      if (row.error_kind === "provider_review") {
+        await commit({})
+        return
+      }
       if (Date.now() - Date.parse(row.created_at) > 120_000)
         await commit({
           status: "failed",
@@ -253,7 +477,12 @@ export async function finalizeUserGeneration(id: string) {
       else await commit({})
       return
     }
-    const connection = await clientForConnection(row.user_id, row.connection_id)
+    const connection =
+      row.billing_source === "subscription"
+        ? await platformHiggsfieldClient(
+            row.platform_connection_id ?? undefined
+          )
+        : await clientForConnection(row.user_id, row.connection_id ?? undefined)
     const status = await connection.client.status(row.provider_request_id)
     if (status.status === "completed") {
       if (!status.artifacts.length) {
@@ -263,6 +492,8 @@ export async function finalizeUserGeneration(id: string) {
             "Higgsfield finished without returning media. Check your API history.",
           finished_at: new Date().toISOString(),
         })
+        if (row.billing_source === "subscription")
+          await settleSubscriptionGeneration(row.id, "failed")
         return
       }
       let temporary = false
@@ -288,6 +519,8 @@ export async function finalizeUserGeneration(id: string) {
           : null,
         error_kind: temporary ? "storage" : null,
       })
+      if (row.billing_source === "subscription")
+        await settleSubscriptionGeneration(row.id, "complete")
     } else if (["failed", "nsfw", "canceled"].includes(status.status)) {
       await commit({
         status: status.status,
@@ -299,6 +532,8 @@ export async function finalizeUserGeneration(id: string) {
               : null,
         finished_at: new Date().toISOString(),
       })
+      if (row.billing_source === "subscription")
+        await settleSubscriptionGeneration(row.id, "failed")
     } else
       await commit({
         status: status.status === "in_progress" ? "in_progress" : "queued",
@@ -312,7 +547,14 @@ export async function cancelUserGeneration(userId: string, id: string) {
   const row = await ownGeneration(userId, id)
   if (row.status !== "queued" || !row.provider_request_id)
     throw new UserFacingError("Only queued generations can be canceled.")
-  const connection = await clientForConnection(userId, row.connection_id)
+  if (row.provider === "openrouter")
+    throw new UserFacingError(
+      "This provider cannot cancel an image once submitted."
+    )
+  const connection =
+    row.billing_source === "subscription"
+      ? await platformHiggsfieldClient(row.platform_connection_id ?? undefined)
+      : await clientForConnection(userId, row.connection_id ?? undefined)
   try {
     await connection.client.cancel(row.provider_request_id)
   } catch (caught) {

@@ -1,6 +1,8 @@
 import { getBalance } from "@/lib/account"
 import { currentUser } from "@/lib/auth/session"
 import { isSupabaseBackend } from "@/lib/backend"
+import { isSubscriptionEdition } from "@/lib/edition"
+import { subscriptionBalance } from "@/lib/supabase/subscription-billing"
 import { connectionStatus } from "@/lib/supabase/connections"
 import { errorResponse, json } from "@/lib/http"
 
@@ -9,6 +11,11 @@ export async function GET() {
   try {
     const user = await currentUser()
     if (!user) return json({ user: null })
+    if (isSupabaseBackend() && isSubscriptionEdition())
+      return json({
+        user: { id: user.id, role: user.role },
+        ...(await subscriptionBalance(user.id)),
+      })
     if (isSupabaseBackend())
       return json({
         user: { id: user.id, role: user.role },

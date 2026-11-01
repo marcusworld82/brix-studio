@@ -129,11 +129,7 @@ export function env(): Env {
     throw new EnvError(`Invalid environment:\n${lines.join("\n")}`)
   }
   const value = parsed.data
-  if (
-    value.NODE_ENV === "production" &&
-    !isBuildPhase() &&
-    process.env.BRIX_EDITION !== "subscription"
-  ) {
+  if (value.NODE_ENV === "production" && !isBuildPhase()) {
     const required =
       value.APP_BACKEND === "supabase"
         ? ([

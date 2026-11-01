@@ -215,13 +215,13 @@ export function useGenerator(surface: Surface, presets: PresetView[] = []) {
 
   const quote = useMemo(
     () =>
-      model && pricing.mode !== "api-key"
+      model && pricing.mode !== "api-key" && pricing.mode !== "subscription"
         ? tryPriceFor(model.id, settings, media, pricing.table, finalPrompt)
         : null,
     [finalPrompt, media, model, pricing.table, pricing.mode, settings]
   )
 
-  const apiMode = pricing.mode === "api-key"
+  const apiMode = pricing.mode === "api-key" || pricing.mode === "subscription"
   const apiPriceInput =
     validation.plane && model
       ? {
@@ -237,12 +237,12 @@ export function useGenerator(surface: Surface, presets: PresetView[] = []) {
       : null
   const apiPrice = useApiPrice(
     apiPriceInput,
-    apiMode && !!user?.apiKeyConnected,
+    apiMode && (pricing.mode === "subscription" || !!user?.apiKeyConnected),
     user?.apiConnectionVersion
   )
   const priceLabel = apiMode
     ? apiPrice.status === "ready" && apiPrice.usd !== null
-      ? `${apiPrice.estimated ? "Est. " : ""}${formatUsd(apiPrice.usd)}`
+      ? `${apiPrice.estimated ? "Est. " : ""}${pricing.mode === "subscription" && apiPrice.credits != null ? apiPrice.credits.toLocaleString() + " credits" : formatUsd(apiPrice.usd)}`
       : apiPrice.status === "loading"
         ? "Pricing…"
         : apiPrice.status === "variable"
@@ -252,13 +252,14 @@ export function useGenerator(surface: Surface, presets: PresetView[] = []) {
             : "Price unavailable"
     : undefined
   const priceBlocked =
-    apiMode && !!user?.apiKeyConnected && apiPrice.status !== "ready"
+    apiMode &&
+    (pricing.mode === "subscription" || !!user?.apiKeyConnected) &&
+    apiPrice.status !== "ready"
 
   const hasInput = finalPrompt.trim().length > 0 || media.length > 0
   // The endpoint these settings reach has no price (yet) on this deployment.
   const unpriced =
-    pricing.mode !== "api-key" &&
-    Boolean(validation.path && !pricing.table[validation.path])
+    !apiMode && Boolean(validation.path && !pricing.table[validation.path])
   const disabledReason = !hasInput
     ? model?.requirePrompt ||
       !model?.roles ||
@@ -308,7 +309,7 @@ export function useGenerator(surface: Surface, presets: PresetView[] = []) {
     const result = await runs.submit({
       submitKey: newKey(),
       ...(apiMode && apiPrice.usd !== null
-        ? { expectedUsd: apiPrice.usd }
+        ? { expectedUsd: apiPrice.usd, expectedCredits: apiPrice.credits }
         : {}),
       modelId: model.id,
       prompt: finalPrompt,

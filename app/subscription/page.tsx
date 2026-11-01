@@ -1,11 +1,10 @@
-import { SubscriptionDemo } from "@/components/subscription/subscription-demo"
-
-export const metadata = {
-  title: "BRIX | Subscription demo",
-  description:
-    "Explore the BRIX monthly credit studio. Local demo only, no payments or generation.",
-}
-
+import { redirect } from "next/navigation"
+import { isSubscriptionEdition } from "@/lib/edition"
 export default function SubscriptionPage() {
-  return <SubscriptionDemo />
+  redirect(
+    isSubscriptionEdition()
+      ? "/pricing"
+      : process.env.NEXT_PUBLIC_SUBSCRIPTION_URL ||
+          "https://brix-subscription.vercel.app/pricing"
+  )
 }

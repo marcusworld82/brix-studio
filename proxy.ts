@@ -17,20 +17,6 @@ const SESSION_COOKIES = [
 
 export async function proxy(request: NextRequest) {
   const { pathname, search } = request.nextUrl
-  if (process.env.BRIX_EDITION === "subscription") {
-    if (
-      (request.method !== "GET" && request.method !== "HEAD") ||
-      pathname.startsWith("/api/")
-    )
-      return NextResponse.json(
-        { error: "The subscription backend is not connected." },
-        { status: 503 }
-      )
-    if (!pathname.startsWith("/subscription"))
-      return NextResponse.redirect(new URL("/subscription", request.url))
-    return NextResponse.next()
-  }
-  if (pathname === "/subscription") return NextResponse.next()
   if (isSupabaseBackend()) {
     let response = NextResponse.next({ request })
     const client = createServerClient(
@@ -90,6 +76,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|icon.svg|media/|model-icons/|api/webhooks/|api/cron/).*)",
+    "/((?!_next/|favicon.ico|icon.svg|media/|model-icons/|api/webhooks/|api/cron/).*)",
   ],
 }

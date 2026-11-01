@@ -67,7 +67,7 @@ if (
 if (!/^#[\da-fA-F]{6}$/.test(value("NEXT_PUBLIC_BRAND_ACCENT")))
   issues.push("NEXT_PUBLIC_BRAND_ACCENT: use six-digit hex color")
 email("NEXT_PUBLIC_SUPPORT_EMAIL", edition === "personal")
-if (edition === "personal") {
+if (edition === "personal" || edition === "subscription") {
   if (value("APP_BACKEND") !== "supabase")
     issues.push("APP_BACKEND: must select supabase")
   url("NEXT_PUBLIC_SUPABASE_URL", true)
@@ -106,7 +106,7 @@ if (issues.length) {
 } else {
   console.log(
     edition === "subscription"
-      ? "Subscription demo configuration shape passed. No services were contacted."
+      ? "Subscription configuration shape passed. Verify database migrations and admin providers. Stripe can remain disconnected."
       : "Personal configuration shape passed. Service access, email delivery, database migrations, storage privacy and provider access still need separate verification."
   )
 }

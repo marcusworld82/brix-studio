@@ -1,95 +1,27 @@
-# Subscription edition integration
+# BRIX subscription edition
 
-The `/subscription` route is a frontend demonstration. It imports no provider,
-Supabase, authentication, payment, database or server generation code. Its only
-persistence is versioned `brix.subscription.demo.v1` browser localStorage.
-Corrupt or unsupported data restores defaults. Storage denial leaves the tab usable.
-The local profile and admin controls are simulations, not security boundaries.
+BRIX_EDITION=subscription uses the same home, image/video studio, uploads, library, templates, account login and navigation as the personal edition. The rejected separate demo and browser-local financial state have been removed. /pricing uses the screenshot-inspired four-tier comparison in BRIX blues. Original repository plan prices remain Starter12/month, Plus35/month, Ultra89/month, with annual monthly equivalents9.60/28/71.20 USD. Teams is contact-only, with no invented shared workspace or unlimited entitlement.
 
-All plan prices, base costs, markups and credits are draft examples. Model names
-are illustrative presets, not claims about a live provider's capabilities.
-Existing reference media is explicitly labeled and never presented as output.
-Simulating previews creates only a prompt/cost history row and deducts local demo
-credits. Plan selection changes the local allowance, preserving previous usage.
-No actual monthly refresh, expiry, rollover, renewal or purchase exists here.
+## Backend setup
 
-## Screen decisions
+Set APP_BACKEND=supabase and configure normal Supabase/Auth/Resend variables using editions/subscription.env.example. Apply all migrations in order. The three November1 migrations add personal OpenRouter keys, service-only subscription ledger/Stripe event handlers and private platform keys. Never run them against another project's database.
 
-The studio's question is: what would this prompt cost in credits? Its quote sits
-beside its settings and above the simulation action. Existing BRIX blue is kept
-on the primary action and usage bar. The flat dark app direction uses existing
-BRIX fonts, a quiet workspace shell, a reference canvas, and computed balances.
-The product-specific element is the editable cost-to-credit preview. History
-starts empty and all totals are calculated from saved local preview rows.
-No invented clients, revenue, sales or generated results are shown.
+Authenticate with the existing verified owner email and password. ADMIN_EMAILS is the authoritative owner allowlist when configured. /admin?tab=providers stores encrypted studio Higgsfield/OpenRouter keys. These are separate from personal API connections, never sent to subscribers, and pinned per job. /admin?tab=pricing edits markup, value per credit, and a fixed full-request credit price for each model. A fixed price overrides automatic markup for that model, including the requested batch count. Model list refreshes from both provider catalogs.
 
-Design source: project DESIGN.md creative brief and taste-skill app-screen run.
-The existing BRIX brand takes precedence over the drawn neutral-only palette.
-A successful Jev judgment returned 0.89 for the proposed flow clearly excluding
-paid production actions. This was one input to the design, not a security test.
+Stripe remains unconnected by Marcus's explicit instruction. The owner-only Pricing screen contains a disabled key placeholder. No live checkout, card charge or credits are fabricated. Later activation requires STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, six recurring plan price IDs and three top-up price IDs. Checkout verifies Stripe price currency, amount and interval against plan defaults. Owner needs to configure the customer portal and signed webhook endpoint /api/webhooks/stripe. Changing a plan constant alone cannot change a Stripe price.
 
-## Future adapters
+## Credit lifecycle
 
-`lib/subscription/adapters.ts` defines contracts for accounts, ledger, server
-quotes and payment redirects. None has an implementation. Replace the demo state
-at the feature boundary instead of promoting localStorage values into real balances.
-Existing personal edition per-user API credentials remain a separate ownership model.
+Fresh server quotes derive model cost and admin markup or configured fixed credit price. The SQL transaction verifies the pricing version and exact credit amount, locks the account, reserves credits and creates the private job idempotently. No client balance, user-supplied plan or client credit amount is authoritative. Concurrency follows the trusted plan and media surface. Each terminal failure refunds once. Completed output and credit settlement are independent so a settlement outage cannot turn a successful paid request into a failed/refunded job.
 
-1. Supabase Auth must verify identity on the server for every private request.
-   Scope account, storage, ledger and job reads by the verified user ID. Apply RLS
-   to every private table. Never accept a user ID, plan entitlement, admin flag,
-   price, credit balance or quote amount from the client as authority.
-2. Monthly allocation policy needs approval before launch: billing periods,
-   rollover, expiry, upgrade proration, downgrade timing, delinquency and refunds.
-   Create subscription, plan version, allocation bucket, credit ledger, reservation,
-   provider job and payment event tables. Store integer credits, fixed-precision
-   monetary amounts, immutable price versions and timestamped quote inputs.
-3. Create server quotes from validated provider schemas and authenticated estimates.
-   Validate asset ownership and inputs, include input hash, expiry and price version,
-   then reserve credits transactionally from that quote. Concurrent requests must
-   never spend below zero. Do not trust the frontend estimate or demo markup.
-4. Server-only owner-funded provider keys must be encrypted or held in secret
-   storage. Never include them in the client, localStorage, logs or release archive.
-   Check provider balance and limits before submitting real work. Personal edition
-   keys must never fall back to the owner's subscription key.
-5. Verified payment webhooks are the source of subscription entitlements. Checkout
-   completion in a browser cannot grant credits. Enforce unique provider event IDs
-   and one allocation per subscription billing-period ID. Replay and out-of-order
-   events must not double grant credits or regress an account's current state.
-6. Use an idempotency key for every reserve, submit, settle, cancel and refund.
-   Bind keys to verified user, job and input hash. Provider job submission needs a
-   durable outbox/reconciliation path for timeouts and process crashes so retries
-   do not submit twice. A unique job reference enforces exactly-once credit effects.
-7. Re-fetch provider terminal status before settling. Failed, rejected, canceled
-   and unsupported jobs refund the reservation once under the approved policy.
-   Reconcile provider cost changes and abandoned reservations without losing user
-   funds. Payment refunds and generation-credit refunds are separate ledgers.
-8. Admin writes require server authorization, audit records and approved price
-   versions. This public local demo is not suitable for administering live prices.
-   Validate any checkout or portal redirect against allowed payment-provider origins.
+Annual payment grants the first monthly allowance. The reconciliation cron calls refillSubscriptionAllowances() for later anchored monthly grants. Each period is unique and replay-safe. Credit grants are additive in this implementation. Prorated plan-change invoices do not grant another full allowance. Refunded payments create an owner billing-review flag, with no unsafe automatic clawback.
 
-## Launch checks still required
+Cron also retries only unsettled terminal reservations, oldest first. A paid POST is never automatically retried. Ambiguous provider outcomes remain marked for review, preserving the reservation until an actual terminal status is known. OpenRouter's synchronous image endpoint cannot automatically recover image bytes lost during an uncertain transport failure; owner review of provider usage is required.
 
-Real account email configuration and auth flows, ownership/RLS tests, simultaneous
-credit spend tests, webhook signature/replay checks, rollback/refund scenarios,
-provider reconciliation, billing tax/currency policies, monitoring, retention rules,
-and approved customer-facing prices. Do not advertise a live subscription until
-these integrations and checks exist.
+## Provider pricing
 
-## Local verification
+Higgsfield authenticated estimate is preferred, with supported verified formula estimates as fallback. OpenRouter Nano Banana estimates use current pinned endpoint rates and official token schedules. Returned usage.cost is saved separately as actual API cost. GPT Image2/2.5's verified output calculator is exposed as output-only information when total input/dimensions are not reliably bound. Unknown totals are not claimed as exact quotes.
 
-`pnpm exec vitest run tests/subscription-demo.test.ts` checks quote arithmetic,
-invalid storage, duplicate rows, overdrafts and plan changes. `pnpm typecheck`
-checks integration with the existing application. Inspect `/subscription` at 320,
-390, 768 and 1440 pixels, and exercise studio settings, account/session, plan panel,
-admin save/discard/reset, history export and browser reload. No network request
-should perform generation, billing, account creation or private data access.
+No Stripe payments or paid media generation are performed by setup/build tests. Verify signup, owner admin access, ordinary-user denial, ownership, provider credentials, quotes, credit races, webhook replays and reconciliation before paid activation.
 
-Build verification (November 1, 2026): all six focused unit tests and scoped
-ESLint passed. Chrome browser checks covered all five views at 320, 390, 768 and
-1440 pixels with no horizontal overflow. Simulation, persisted history after
-reload, JSON export, plan selection, admin save, profile save, demo sign out/in,
-video settings, reset and corrupt-storage recovery passed with no page errors.
-The first full typecheck encountered concurrent edits in the live catalog; the
-next encountered an unfinished published-cost test import outside this feature.
-The root build owner must rerun full checks after those parallel edits finish.
+Personal OpenRouter token-priced models can be submitted only after per-request usage billing consent. The server binds that consent to the current provider pricing fingerprint and exact inputs, and rechecks before the paid POST. The displayed output-only range is not called a total. Subscription mode still requires a numeric studio credit quote. No such consent was exercised against a real provider during testing.

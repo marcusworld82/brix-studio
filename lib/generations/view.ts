@@ -19,7 +19,8 @@ export interface OutputView {
 }
 
 export interface GenerationView {
-  billingSource?: "higgsfield-api"
+  billingSource?: "higgsfield-api" | "openrouter-api" | "subscription"
+  apiCostActual?: number | null
   apiCostEstimate?: number | null
   id: string
   surface: Surface

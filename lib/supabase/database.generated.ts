@@ -17,7 +17,14 @@ export type Database = {
       brix_generations: {
         Row: {
           aspect: number
-          connection_id: string
+          provider_actual_cost?: number | null
+          provider?: string
+          billing_source?: string
+          credit_cost?: number
+          refunded_credits?: number
+          openrouter_connection_id?: string | null
+          platform_connection_id?: string | null
+          connection_id: string | null
           created_at: string
           error: string | null
           error_kind: string | null
@@ -44,7 +51,14 @@ export type Database = {
         }
         Insert: {
           aspect?: number
-          connection_id: string
+          provider_actual_cost?: number | null
+          provider?: string
+          billing_source?: string
+          credit_cost?: number
+          refunded_credits?: number
+          openrouter_connection_id?: string | null
+          platform_connection_id?: string | null
+          connection_id: string | null
           created_at?: string
           error?: string | null
           error_kind?: string | null
@@ -71,7 +85,14 @@ export type Database = {
         }
         Update: {
           aspect?: number
-          connection_id?: string
+          provider_actual_cost?: number | null
+          provider?: string
+          billing_source?: string
+          credit_cost?: number
+          refunded_credits?: number
+          openrouter_connection_id?: string | null
+          platform_connection_id?: string | null
+          connection_id?: string | null
           created_at?: string
           error?: string | null
           error_kind?: string | null
@@ -305,7 +326,14 @@ export type Database = {
         Args: { target_generation_id: string }
         Returns: {
           aspect: number
-          connection_id: string
+          provider_actual_cost?: number | null
+          provider?: string
+          billing_source?: string
+          credit_cost?: number
+          refunded_credits?: number
+          openrouter_connection_id?: string | null
+          platform_connection_id?: string | null
+          connection_id: string | null
           created_at: string
           error: string | null
           error_kind: string | null
@@ -349,7 +377,7 @@ export type Database = {
         Returns: undefined
       }
       brix_get_connection: {
-        Args: { target_connection_id?: string; target_user_id: string }
+        Args: { target_connection_id?: string | null; target_user_id: string }
         Returns: {
           encrypted_credentials: string
           id: string
@@ -375,7 +403,7 @@ export type Database = {
         Args: {
           job: Json
           request_body: Json
-          target_connection_id: string
+          target_connection_id: string | null
           target_user_id: string
         }
         Returns: Json

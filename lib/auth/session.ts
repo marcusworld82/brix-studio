@@ -33,14 +33,14 @@ export async function currentUser(): Promise<SessionUser | null> {
       .select("role, display_name")
       .eq("id", data.user.id)
       .single()
+    const owners = (process.env.ADMIN_EMAILS ?? "")
+      .split(",")
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean)
     const admin =
-      profile?.role === "admin" ||
-      (process.env.ADMIN_EMAILS ?? "")
-        .split(",")
-        .some(
-          (email) =>
-            email.trim().toLowerCase() === data.user!.email!.toLowerCase()
-        )
+      owners.length > 0
+        ? owners.includes(data.user.email.toLowerCase())
+        : profile?.role === "admin"
     if (admin && profile?.role !== "admin")
       await createSupabaseServiceClient()
         .from("brix_profiles")

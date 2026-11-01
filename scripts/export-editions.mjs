@@ -128,6 +128,7 @@ for (const required of [...roots]
     throw new Error(`Required release file missing: ${required}`)
 }
 const credentialPatterns = [
+  /sk-or-v1-[A-Za-z0-9]{16,}/,
   /-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/,
   /\b(?:sk|rk)_(?:live|test)_[A-Za-z0-9]{16,}/,
   /\bwhsec_[A-Za-z0-9]{16,}/,
@@ -180,7 +181,7 @@ try {
     )
     writeFileSync(
       join(stage, "README.md"),
-      `# BRIX ${edition} edition\n\n${edition === "personal" ? "Customer-owned API studio. Each customer must configure their own backend and verified email sender before public use. No recurring BRIX subscription fee is configured." : "Frontend demo only. No real accounts, payments or provider generation. All financial examples are drafts."}\n\n1. Install a current supported Node.js version and pnpm.\n2. Run \`pnpm install --frozen-lockfile\`.\n3. Copy \`.env.example\` to \`.env.local\` and follow \`docs/personal-edition-setup.md\` for personal setup or \`docs/subscription-integration.md\` for the demo.\n4. Run \`pnpm exec tsx scripts/check-personal-setup.ts\`.\n5. Run \`pnpm dev\`. Open ${edition === "personal" ? "/image or /video" : "/subscription"}.\n6. Deploy only after the checks in \`docs/editions-handover.md\`. Use \`pnpm build\` and \`pnpm start\` for a production build.\n\nEdition mode: \`BRIX_EDITION=${edition}\`. Public branding variables are compiled into the browser bundle, so rebuild after changing them.\n\nThis archive includes source and curated public assets. It excludes private configuration, customer media, deployment IDs, internal notes and the internal test/fixture suite. No backend is pre-provisioned and no paid generation was performed during export.\n`
+      `# BRIX ${edition} edition\n\n${edition === "personal" ? "Customer-owned API studio. Each customer must configure their own backend and verified email sender before public use. No recurring BRIX subscription fee is configured." : "Full BRIX studio with Supabase accounts, private media, owner-funded provider connections and credits. Stripe remains disconnected until owner setup."}\n\n1. Install a current supported Node.js version and pnpm.\n2. Run \`pnpm install --frozen-lockfile\`.\n3. Copy \`.env.example\` to \`.env.local\` and follow \`docs/personal-edition-setup.md\` for personal setup or \`docs/subscription-integration.md\` for subscription setup.\n4. Run \`pnpm exec tsx scripts/check-personal-setup.ts\`.\n5. Run \`pnpm dev\`. Open ${edition === "personal" ? "/image or /video" : "/subscription"}.\n6. Deploy only after the checks in \`docs/editions-handover.md\`. Use \`pnpm build\` and \`pnpm start\` for a production build.\n\nEdition mode: \`BRIX_EDITION=${edition}\`. Public branding variables are compiled into the browser bundle, so rebuild after changing them.\n\nThis archive includes source and curated public assets. It excludes private configuration, customer media, deployment IDs, internal notes and the internal test/fixture suite. No backend is pre-provisioned and no paid generation was performed during export.\n`
     )
     const files = [...paths, ".env.example", "README.md"].sort()
     const manifest = {

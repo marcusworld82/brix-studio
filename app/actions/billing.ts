@@ -3,6 +3,10 @@
 import { runAction } from "@/lib/action-result"
 import type { ActionResult } from "@/lib/action-types"
 import { requireUser } from "@/lib/auth/session"
+import {
+  createSubscriptionCheckout,
+  createSubscriptionPortal,
+} from "@/lib/supabase/subscription-billing"
 import { isSupabaseBackend } from "@/lib/backend"
 import { UserFacingError } from "@/lib/errors"
 import {
@@ -21,6 +25,8 @@ export async function checkoutAction(
 ): Promise<ActionResult<{ url: string }>> {
   return runAction(async () => {
     const user = await requireUser()
+    if (isSupabaseBackend() && process.env.BRIX_EDITION === "subscription")
+      return createSubscriptionCheckout(user, input)
     if (isSupabaseBackend())
       throw new UserFacingError(
         "Generation billing is handled by your Higgsfield API account."
@@ -32,6 +38,8 @@ export async function checkoutAction(
 export async function portalAction(): Promise<ActionResult<{ url: string }>> {
   return runAction(async () => {
     const user = await requireUser()
+    if (isSupabaseBackend() && process.env.BRIX_EDITION === "subscription")
+      return createSubscriptionPortal(user)
     if (isSupabaseBackend())
       throw new UserFacingError(
         "Generation billing is handled by your Higgsfield API account."

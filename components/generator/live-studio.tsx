@@ -106,7 +106,7 @@ export function AutomaticStudio({
 }
 
 export function LiveStudio({ surface }: { surface: Surface }) {
-  const { user, openAuth } = useApp()
+  const { user, openAuth, pricing } = useApp()
   const params = useSearchParams()
   const [catalog, setCatalog] = useState<LiveCatalog | null>(null)
   const [selected, setSelected] = useState(
@@ -121,6 +121,7 @@ export function LiveStudio({ surface }: { surface: Surface }) {
   const [search, setSearch] = useState("")
   const [error, setError] = useState("")
   const [submitting, setSubmitting] = useState(false)
+  const [acceptedUsageFor, setAcceptedUsageFor] = useState("")
   const runs = useRuns({ surface, enabled: !!user })
   const uploadState = useUploads()
   const loadUploads = uploadState.load
@@ -210,14 +211,29 @@ export function LiveStudio({ surface }: { surface: Surface }) {
         media: [],
       }
     : null
+  const subscription = pricing.mode === "subscription"
+  const connected =
+    subscription ||
+    (selected.startsWith("or:")
+      ? user?.openRouterConnected
+      : user?.apiKeyConnected)
   const price = useApiPrice(
     input,
-    !!user?.apiKeyConnected &&
-      !!current &&
-      !current.stale &&
-      !Object.keys(invalid).length,
+    !!connected && !!current && !current.stale && !Object.keys(invalid).length,
     user?.apiConnectionVersion
   )
+  const usageKey = JSON.stringify({
+    owner: user?.id,
+    connection: user?.apiConnectionVersion,
+    input,
+    fingerprint: price.priceFingerprint,
+  })
+  const usageAccepted =
+    price.status === "variable" &&
+    price.allowUsagePrice === true &&
+    acceptedUsageFor === usageKey
+  const quoteReady =
+    (price.status === "ready" && price.usd !== null) || usageAccepted
   const models = (catalog?.models ?? []).filter((m) => m.surface === surface)
   const visible = models.filter((m) =>
     `${m.label} ${m.family}`.toLowerCase().includes(search.toLowerCase())
@@ -263,6 +279,9 @@ export function LiveStudio({ surface }: { surface: Surface }) {
     setFormRevision((revision) => revision + 1)
     setError("")
   }, [])
+  const review = runs.records.find(
+    (run) => run.modelId === selected && run.errorKind === "provider_review"
+  )
   const { actions, dialogs } = useTileActions({ runs, reuse })
   const items = useMemo(
     () => runs.records.flatMap(runToGalleryItems),
@@ -273,14 +292,8 @@ export function LiveStudio({ surface }: { surface: Surface }) {
       openAuth({ mode: "signup" })
       return
     }
-    if (!user.apiKeyConnected) return
-    if (
-      !current ||
-      price.status !== "ready" ||
-      price.usd === null ||
-      submitting ||
-      Object.keys(invalid).length
-    )
+    if (!connected) return
+    if (!current || !quoteReady || submitting || Object.keys(invalid).length)
       return
     setSubmitting(true)
     setError("")
@@ -288,7 +301,10 @@ export function LiveStudio({ surface }: { surface: Surface }) {
       const outcome = await runs.submit({
         ...input!,
         submitKey: crypto.randomUUID(),
-        expectedUsd: price.usd,
+        expectedUsd: price.usd ?? undefined,
+        acceptVariablePrice: usageAccepted,
+        expectedPriceFingerprint: price.priceFingerprint,
+        expectedCredits: price.credits,
       })
       if (!outcome.ok) {
         setError(outcome.error)
@@ -300,10 +316,12 @@ export function LiveStudio({ surface }: { surface: Surface }) {
   }
   const priceLabel =
     price.status === "ready" && price.usd !== null
-      ? `${price.estimated ? "Est. " : ""}${formatUsd(price.usd)}`
+      ? `${price.estimated ? "Est. " : ""}${subscription && price.credits != null ? price.credits.toLocaleString() + " credits" : formatUsd(price.usd)}`
       : price.status === "loading"
         ? "Pricing…"
-        : "Price pending"
+        : price.status === "variable" && price.allowUsagePrice
+          ? "Usage pricing"
+          : "Price pending"
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto px-2 pb-2 md:flex-row md:overflow-hidden md:px-4">
       <section
@@ -382,11 +400,35 @@ export function LiveStudio({ surface }: { surface: Surface }) {
                 record(raw) ? (
                   <LiveField
                     key={`${current.id}:${formRevision}:${key}`}
-                    name={key}
-                    schema={raw}
+                    name={
+                      key === "input_references" && current.id.startsWith("or:")
+                        ? "image_urls"
+                        : key
+                    }
+                    schema={
+                      key === "input_references" && current.id.startsWith("or:")
+                        ? { ...raw, title: "Reference images" }
+                        : raw
+                    }
                     required={required.includes(key)}
-                    value={values[key]}
-                    onChange={(v) => patch(key, v)}
+                    value={
+                      key === "input_references" && Array.isArray(values[key])
+                        ? (values[key] as { image_url: { url: string } }[]).map(
+                            (v) => v.image_url.url
+                          )
+                        : values[key]
+                    }
+                    onChange={(v) =>
+                      patch(
+                        key,
+                        key === "input_references" && Array.isArray(v)
+                          ? v.map((url) => ({
+                              type: "image_url",
+                              image_url: { url },
+                            }))
+                          : v
+                      )
+                    }
                     onError={(message) => fieldError(key, message)}
                     library={library}
                     signedIn={!!user}
@@ -404,6 +446,15 @@ export function LiveStudio({ surface }: { surface: Surface }) {
               <Loader2 className="size-4 animate-spin" /> Loading model inputs…
             </p>
           )}
+          {review ? (
+            <p
+              role="alert"
+              className="rounded-xl border border-amber-300/20 p-3 text-xs text-amber-100"
+            >
+              An earlier request needs provider review. Check its usage before
+              submitting this model again.
+            </p>
+          ) : null}
           {error || runs.error ? (
             <p
               role="alert"
@@ -411,6 +462,20 @@ export function LiveStudio({ surface }: { surface: Surface }) {
             >
               {error || runs.error}
             </p>
+          ) : null}
+          {price.status === "variable" && price.allowUsagePrice ? (
+            <label className="flex items-start gap-3 rounded-xl border border-white/15 p-3 text-xs leading-relaxed text-white/75">
+              <input
+                className="mt-0.5 size-4 shrink-0 accent-lime"
+                type="checkbox"
+                checked={usageAccepted}
+                onChange={(e) =>
+                  setAcceptedUsageFor(e.target.checked ? usageKey : "")
+                }
+              />
+              I accept usage-based billing from my OpenRouter account. The exact
+              total is reported after generation.
+            </label>
           ) : null}
           {price.error ? (
             <p role="status" className="text-xs text-amber-200">
@@ -426,23 +491,25 @@ export function LiveStudio({ surface }: { surface: Surface }) {
             >
               Create your account <ArrowRight className="ml-2 inline size-4" />
             </button>
-          ) : !user.apiKeyConnected ? (
+          ) : !connected ? (
             <Link
               className="btn-keycap flex h-12 items-center justify-center rounded-xl text-sm font-semibold"
               href="/account"
             >
-              Connect your API key
+              Connect your{" "}
+              {selected.startsWith("or:") ? "OpenRouter" : "Higgsfield"} API key
             </Link>
           ) : (
             <button
               className="btn-keycap btn-keycap-generate flex min-h-12 items-center justify-center gap-3 rounded-xl px-3 text-sm font-semibold disabled:opacity-50"
               onClick={() => void generate()}
               disabled={
-                price.status !== "ready" ||
+                !quoteReady ||
                 submitting ||
                 !current ||
                 current.stale ||
-                !!Object.keys(invalid).length
+                !!Object.keys(invalid).length ||
+                !!review
               }
             >
               {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
@@ -454,6 +521,11 @@ export function LiveStudio({ surface }: { surface: Surface }) {
           )}
           {price.status === "ready" ? (
             <p className="text-center text-[11px] leading-relaxed text-white/50">
+              {subscription && price.credits != null
+                ? "Studio price: " +
+                  price.credits.toLocaleString() +
+                  " credits. "
+                : ""}
               {price.explanation}
               {price.discountUsd
                 ? ` Includes ${formatUsd(price.discountUsd)} provider discount.`

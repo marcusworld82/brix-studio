@@ -1,0 +1,88 @@
+{
+  "checkedAt": "2026-11-01",
+  "sources": [
+    "https://developers.openai.com/api/docs/guides/image-generation#cost-and-latency",
+    "https://developers.openai.com/_astro/GptImageTokenCalculator.react.FCse3GSx.js",
+    "https://ai.google.dev/gemini-api/docs/pricing",
+    "https://ai.google.dev/gemini-api/docs/image-generation#aspect_ratios_and_image_size"
+  ],
+  "gptOutputTokens": [
+    {
+      "path": "openai/gpt-image-2.5-flare",
+      "quality": "low",
+      "width": 1024,
+      "height": 1024,
+      "tokens": 196
+    },
+    {
+      "path": "openai/gpt-image-2.5-flare",
+      "quality": "medium",
+      "width": 1024,
+      "height": 1024,
+      "tokens": 439
+    },
+    {
+      "path": "openai/gpt-image-2.5-sunburst",
+      "quality": "high",
+      "width": 1024,
+      "height": 1024,
+      "tokens": 1756
+    },
+    {
+      "path": "openai/gpt-image-2.5-sunburst",
+      "quality": "xhigh",
+      "width": 1024,
+      "height": 1024,
+      "tokens": 3122
+    },
+    {
+      "path": "openai/gpt-image-2.5-sunburst",
+      "quality": "max",
+      "width": 1024,
+      "height": 1024,
+      "tokens": 7024
+    },
+    {
+      "path": "openai/gpt-image-2",
+      "quality": "medium",
+      "width": 1536,
+      "height": 1024,
+      "tokens": 1372
+    },
+    {
+      "path": "openai/gpt-image-2.5-flare",
+      "quality": "medium",
+      "width": 1024,
+      "height": 704,
+      "tokens": 262
+    }
+  ],
+  "nanoOutputTokens": [
+    {
+      "path": "google/gemini-3.1-flash-image",
+      "resolution": "512",
+      "tokens": 747
+    },
+    {
+      "path": "google/gemini-3.1-flash-image",
+      "resolution": "1K",
+      "tokens": 1120
+    },
+    {
+      "path": "google/gemini-3.1-flash-image",
+      "resolution": "2K",
+      "tokens": 1680
+    },
+    {
+      "path": "google/gemini-3.1-flash-image",
+      "resolution": "4K",
+      "tokens": 2520
+    },
+    {
+      "path": "google/gemini-nano-banana-2.1",
+      "resolution": "4K",
+      "tokens": 3780
+    },
+    { "path": "google/gemini-3-pro-image", "resolution": "4K", "tokens": 2000 }
+  ]
+}

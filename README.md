@@ -1,6 +1,6 @@
 # BRIX studio
 
-Two editions now share this codebase. Personal uses each customer's Higgsfield API key and private Supabase backend. Subscription is a frontend demo only at `/subscription`, with no real billing or generation.
+Two editions now share this codebase. Personal uses each customer's Higgsfield/OpenRouter API keys and private Supabase backend. Subscription uses the same BRIX studio with credits, owner-only model pricing/provider keys and a Stripe setup placeholder. Stripe activation is deliberately deferred.
 
 - Setup: [Personal edition](docs/personal-edition-setup.md), [Subscription integration](docs/subscription-integration.md).
 - Customer packages: `pnpm editions:export --out /tmp/brix-delivery`.

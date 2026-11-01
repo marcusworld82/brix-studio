@@ -14,6 +14,9 @@ import { CookieConsent } from "@/components/site/cookie-consent"
 import { getBalance } from "@/lib/account"
 import { currentUser } from "@/lib/auth/session"
 import { isSupabaseBackend } from "@/lib/backend"
+import { isSubscriptionEdition } from "@/lib/edition"
+import { subscriptionBalance } from "@/lib/supabase/subscription-billing"
+import { connectionStatus as openRouterStatus } from "@/lib/supabase/openrouter-connections"
 import { connectionStatus } from "@/lib/supabase/connections"
 import { env } from "@/lib/env"
 import { BRAND } from "@/lib/brand"
@@ -75,18 +78,34 @@ async function bootstrap(): Promise<{
   credits: number | null
   pricing: ClientPricing
 }> {
-  if (process.env.BRIX_EDITION === "subscription")
-    return {
-      user: null,
-      credits: null,
-      pricing: { mode: "credits", table: {}, disabled: [], fromPrices: {} },
-    }
   const pricing = await clientPricing()
   try {
     const user = await currentUser()
     if (!user) return { user: null, credits: null, pricing }
     if (isSupabaseBackend()) {
-      const connection = await connectionStatus()
+      if (isSubscriptionEdition()) {
+        const balance = await subscriptionBalance(user.id).catch(() => ({
+          total: null,
+        }))
+        return {
+          user: {
+            id: user.id,
+            role: user.role,
+            email: user.email,
+            name: user.name,
+            apiKeyConnected: true,
+          },
+          credits: balance.total,
+          pricing,
+        }
+      }
+      const [connection, openRouter] = await Promise.all([
+        connectionStatus(),
+        openRouterStatus().catch(() => ({
+          connected: false,
+          savedAt: undefined,
+        })),
+      ])
       return {
         user: {
           id: user.id,
@@ -94,7 +113,11 @@ async function bootstrap(): Promise<{
           email: user.email,
           name: user.name,
           apiKeyConnected: connection.connected,
-          apiConnectionVersion: connection.savedAt,
+          openRouterConnected: openRouter.connected,
+          apiConnectionVersion:
+            [connection.savedAt, openRouter.savedAt]
+              .filter(Boolean)
+              .join(":") || undefined,
         },
         credits: null,
         pricing,
@@ -156,13 +179,9 @@ export default async function RootLayout({
         <AppProviders user={user} initialCredits={credits} pricing={pricing}>
           <MobileViewportGuard />
           {children}
-          {process.env.BRIX_EDITION !== "subscription" ? (
-            <>
-              <AuthModal />
-              <UpgradeModal />
-              <CookieConsent />
-            </>
-          ) : null}
+          <AuthModal />
+          <UpgradeModal />
+          <CookieConsent />
         </AppProviders>
       </body>
     </html>

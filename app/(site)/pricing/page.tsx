@@ -1,3 +1,6 @@
+import { SubscriptionPricing } from "@/components/billing/subscription-pricing"
+import { isSubscriptionEdition } from "@/lib/edition"
+import { subscriptionCheckoutReady } from "@/lib/supabase/subscription-billing"
 import { LivePricing } from "@/components/billing/live-pricing"
 import type { Metadata } from "next"
 import Link from "next/link"
@@ -117,6 +120,8 @@ const FAQ: { q: string; a: ReactNode }[] = [
 ]
 
 export default function PricingPage() {
+  if (isSubscriptionEdition())
+    return <SubscriptionPricing checkoutReady={subscriptionCheckoutReady()} />
   if (isSupabaseBackend()) return <LivePricing />
   return (
     <div className="relative isolate">

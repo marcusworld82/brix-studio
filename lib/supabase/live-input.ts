@@ -1,5 +1,5 @@
 import "server-only"
-import { getLiveModel } from "@/lib/higgsfield/live-catalog"
+import { getProviderModel } from "@/lib/providers/catalog"
 import { validateLiveInput } from "@/generation/catalog/live-schema"
 import { groupMedia } from "@/generation/catalog/media-inputs"
 import type { MediaItem, MediaRole } from "@/generation/catalog/types"
@@ -12,7 +12,7 @@ export async function prepareLiveUserGeneration(
   userId: string,
   input: { modelId: string; settings: Record<string, unknown>; prompt: string }
 ) {
-  const definition = await getLiveModel(input.modelId)
+  const definition = await getProviderModel(input.modelId)
   if (!definition)
     throw new UserFacingError("This model is not currently in the API catalog.")
   if (definition.stale)

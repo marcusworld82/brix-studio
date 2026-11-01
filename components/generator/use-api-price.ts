@@ -5,6 +5,9 @@ import type { SubmitInput } from "@/lib/generations/submit"
 type Quote = {
   key: string
   status: "idle" | "loading" | "ready" | "error" | "variable"
+  allowUsagePrice?: boolean
+  priceFingerprint?: string
+  credits?: number
   estimated?: boolean
   explanation?: string
   discountUsd?: number
@@ -15,7 +18,7 @@ export function useApiPrice(
   input: Omit<SubmitInput, "submitKey"> | null,
   enabled: boolean,
   version?: string
-) {
+): Omit<Quote, "key"> {
   const [refresh, setRefresh] = useState(0)
   const key = JSON.stringify({ input, version, refresh })
   const [state, setState] = useState<Quote>({
@@ -61,6 +64,8 @@ export function useApiPrice(
             key,
             status: data.status === "ready" ? "ready" : "variable",
             usd: data.status === "ready" ? data.usd : null,
+            credits:
+              typeof data.credits === "number" ? data.credits : undefined,
             estimated: data.estimated === true,
             explanation:
               typeof data.explanation === "string"

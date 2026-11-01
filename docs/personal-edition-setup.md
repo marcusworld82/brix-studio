@@ -120,3 +120,7 @@ changes are shipped. Provider compatibility is not a promise that every future
 model can run without review. Before an upgrade, back up the database and secret
 configuration, read release notes, apply reviewed migrations, rebuild, and run the
 ownership, quote and lifecycle checks in `docs/editions-handover.md`.
+
+## November1 update
+
+Apply the November1 migrations before using OpenRouter connections. OpenRouter and Higgsfield keys are provider-separated and encrypted per user. User keys never fall back to studio-funded keys. Nano Banana estimates use official token schedules with current endpoint rates. OpenRouter actual usage cost is stored separately and shown in generation details. GPT output-only calculations are clearly distinguished from total quotes. The Provider pricing button is removed from the personal pricing page.
