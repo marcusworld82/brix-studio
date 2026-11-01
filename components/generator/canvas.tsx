@@ -71,7 +71,8 @@ export function HowItWorks({
   return (
     <div
       className={cn(
-        "flex min-h-full flex-col justify-center gap-10 px-6 py-10 md:px-12",
+        "flex min-h-full flex-col gap-10 px-6 py-10 md:px-12",
+        surface === "image" ? "shrink-0 justify-start" : "justify-center",
         centered && "items-center text-center"
       )}
     >
