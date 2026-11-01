@@ -143,6 +143,7 @@ describe("video workflow shortcuts", () => {
   it("recognizes explicit operation names and leaves unknown paths unclassified", () => {
     expect(videoWorkflow("kling-video/v3.0/pro/image-to-video")).toBe("create")
     expect(videoWorkflow("higgsfield/genjutsu/object-swap/v1.0")).toBe("edit")
+    expect(videoWorkflow("higgsfield/genjutsu/restyle/v1.0")).toBe("edit")
     expect(videoWorkflow("higgsfield/genjutsu/motion-transfer/v1.0")).toBe(
       "motion"
     )

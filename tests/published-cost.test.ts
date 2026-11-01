@@ -21,6 +21,66 @@ const pricing = {
   ],
 }
 describe("Published formula estimates", () => {
+  const restylePath = "higgsfield/genjutsu/restyle/v1.0"
+  const restyleRates =
+    "Roughly costs $0.318 per second at 480p, $0.681 per second at 720p, or $1.632 per second at 1080p."
+  it.each([
+    ["480p", 2.862],
+    ["720p", 6.129],
+    ["1080p", 14.688],
+  ])(
+    "quotes Restyle at %s from current provider rates and rounded source duration",
+    (resolution, usd) => {
+      expect(
+        publishedCost(restylePath, { resolution }, null, restyleRates, [
+          { kind: "video", role: "source", durationSec: 8.1 },
+        ])
+      ).toMatchObject({ usd, estimated: true, source: "published" })
+    }
+  )
+  it("uses updated Restyle rates and its documented 30 second trim", () => {
+    expect(
+      publishedCost(
+        restylePath,
+        { resolution: "720p", duration: 1 },
+        null,
+        restyleRates.replace("$0.681", "$0.7"),
+        [{ kind: "video", role: "source", durationSec: 35.1 }]
+      )
+    ).toMatchObject({ usd: 21, estimated: true })
+  })
+  it("refuses Restyle quotes with unknown rates or unverified source duration", () => {
+    for (const seconds of [undefined, 0, 3.9, Infinity])
+      expect(
+        publishedCost(restylePath, { resolution: "720p" }, null, restyleRates, [
+          { kind: "video", role: "source", durationSec: seconds },
+        ])
+      ).toBeNull()
+    expect(
+      publishedCost(
+        restylePath,
+        { resolution: "720p" },
+        null,
+        "Pricing unavailable",
+        [{ kind: "video", role: "source", durationSec: 8 }]
+      )
+    ).toBeNull()
+    expect(
+      publishedCost(
+        restylePath,
+        { resolution: "720p" },
+        null,
+        restyleRates + " An extra input fee also applies.",
+        [{ kind: "video", role: "source", durationSec: 8 }]
+      )
+    ).toBeNull()
+    expect(
+      publishedCost(restylePath, { resolution: "720p" }, null, restyleRates, [
+        { kind: "video", role: "source", durationSec: 8 },
+        { kind: "video", role: "video", durationSec: 2 },
+      ])
+    ).toBeNull()
+  })
   const lightDescription =
     "Priced per total second by resolution: 480p $0.05, 720p $0.10, or 1080p $0.20. Rates shown are before any applicable customer discount. Billable seconds = output duration + the sum of input reference video durations. Input video durations are measured during preprocessing; without video references, only output duration is billed. Genjutsu Light trims the source to 15 seconds; output duration is rounded up to whole seconds before billing."
   const lightPricing = {

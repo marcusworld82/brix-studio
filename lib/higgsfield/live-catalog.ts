@@ -15,6 +15,10 @@ export const PRICING_PATH = "/api/v2/pricing/models/"
 const METADATA_TTL = 5 * 60_000
 const PRICING_TTL = 60_000
 const MAX_PAGES = 20
+// Public app-model detail and authenticated presets are verified, but this API
+// mode is currently absent from both discovery feeds. Reverify its detail before
+// listing it; never promote an arbitrary client-provided path.
+const RESTYLE_PATH = "higgsfield/genjutsu/restyle/v1.0"
 export type CatalogFetch = (
   url: string,
   init?: RequestInit
@@ -339,6 +343,52 @@ export function createLiveCatalogClient(
   )
   const detailPending = new Map<string, Promise<LiveModelDefinition | null>>()
   let pending: Promise<LiveCatalog> | null = null
+  async function restyleSupplement(): Promise<LiveModelDefinition | null> {
+    const id = `hf:${RESTYLE_PATH}`
+    const previous = definitions.get(id)
+    if (
+      previous &&
+      !previous.stale &&
+      now() - previous.fetchedAt < METADATA_TTL
+    )
+      return previous
+    try {
+      const response = await fetcher(
+        `${BASE}/api/v2/app-models/${RESTYLE_PATH}/`,
+        {
+          cache: "no-store",
+          redirect: "error",
+          signal: AbortSignal.timeout(10_000),
+          headers: { Accept: "application/json" },
+        }
+      )
+      if (!response.ok) return null
+      const body = await response.text()
+      if (body.length > 2_000_000) return null
+      const raw: unknown = JSON.parse(body)
+      if (
+        !isRecord(raw) ||
+        raw.availability_state !== "available" ||
+        raw.output_type !== "video"
+      )
+        return null
+      const model = summary(raw, { title: "Genjutsu" }, RESTYLE_PATH, "video")
+      const detail = normalizeLiveDefinition(model, raw, now())
+      const properties = detail.inputSchema.properties
+      if (
+        !isRecord(properties) ||
+        !isRecord(properties.preset_id) ||
+        properties.preset_id.format !== "uuid" ||
+        !isRecord(properties.video_url) ||
+        properties.video_url.format !== "uri"
+      )
+        return null
+      definitions.set(id, detail)
+      return detail
+    } catch {
+      return null
+    }
+  }
   function state(): LiveCatalog {
     return structuredClone({
       models,
@@ -389,6 +439,28 @@ export function createLiveCatalogClient(
         results.every((result) => result.status === "fulfilled")
       ) {
         const nextModels = normalizeLiveCatalog(nextCatalog, nextPrices)
+        if (
+          !nextModels.some((model) => model.path === RESTYLE_PATH) &&
+          nextModels.some((model) =>
+            model.path.startsWith("higgsfield/genjutsu/")
+          )
+        ) {
+          const restyle = await restyleSupplement()
+          if (restyle) {
+            nextModels.push({
+              id: restyle.id,
+              path: restyle.path,
+              label: restyle.label,
+              family: restyle.family,
+              surface: restyle.surface,
+              description: restyle.description,
+              ...(restyle.previewImage
+                ? { previewImage: restyle.previewImage }
+                : {}),
+            })
+            nextModels.sort((a, b) => a.label.localeCompare(b.label))
+          }
+        }
         models = nextModels
         catalogRows = nextCatalog
         priceRows = nextPrices

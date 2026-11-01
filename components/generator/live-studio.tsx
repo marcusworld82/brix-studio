@@ -48,6 +48,8 @@ import { PromptBox } from "@/components/studio/prompt-box"
 import { LiveReferencePrompt } from "./live-reference-prompt"
 import { referenceIdentity } from "./reference-identity"
 import { familyCover } from "@/lib/showcase"
+import { useGeneratorPreset } from "@/components/provider-presets/use-generator-preset"
+import { ProviderPresetPicker } from "@/components/provider-presets/picker"
 import {
   liveFieldDisplay,
   orderLiveFields,
@@ -254,6 +256,17 @@ export function LiveStudio({ surface }: { surface: Surface }) {
   const required = Array.isArray(effectiveSchema.required)
     ? (effectiveSchema.required as string[])
     : []
+  const providerPreset = useGeneratorPreset({
+    model: current,
+    values,
+    setValues,
+    setModel: setSelected,
+    requestedModel: params.get("liveModel") ?? params.get("model") ?? "",
+    requestedCatalog: params.get("providerCatalog"),
+    requestedId: params.get("providerPreset"),
+    required,
+  })
+  mediaProblems.push(...providerPreset.problems)
   const relevantInvalid = current
     ? visibleFieldErrors(current, values, properties, invalid)
     : invalid
@@ -320,6 +333,12 @@ export function LiveStudio({ surface }: { surface: Surface }) {
     ...runs.records.flatMap(runToLibraryItems),
   ]
   const patch = (key: string, value: unknown, promptOverride?: string) => {
+    if (
+      key === "enhance_prompt" &&
+      value === false &&
+      providerPreset.catalog === "marketing"
+    )
+      providerPreset.abandonLink()
     const disablingShots = key === "multi_shots" && value === false
     if (current) {
       const prospective = { ...values, [key]: value }
@@ -355,6 +374,12 @@ export function LiveStudio({ surface }: { surface: Surface }) {
       else next[key] = value
       if (disablingShots) delete next.multi_prompt
       if (
+        key === "enhance_prompt" &&
+        value === false &&
+        providerPreset.catalog === "marketing"
+      )
+        delete next.preset_id
+      if (
         key === "multi_prompt" &&
         record(properties.multi_shots) &&
         properties.multi_shots.type === "boolean"
@@ -370,23 +395,28 @@ export function LiveStudio({ surface }: { surface: Surface }) {
       else delete next[key]
       return next
     })
-  const reuse = useCallback((run: GenerationView) => {
-    if (!run.modelId.startsWith("hf:") && !run.modelId.startsWith("or:")) {
-      setValues((old) => ({ ...old, prompt: run.prompt }))
-      setError(
-        "Prompt reused. Choose a current API model and review its settings before generating."
-      )
-      return
-    }
-    const saved = { ...run.settings }
-    delete saved.aspectRatio
-    lastModel.current = run.modelId
-    setSelected(run.modelId)
-    setValues(saved)
-    setInvalid({})
-    setFormRevision((revision) => revision + 1)
-    setError("")
-  }, [])
+  const abandonPresetLink = providerPreset.abandonLink
+  const reuse = useCallback(
+    (run: GenerationView) => {
+      abandonPresetLink()
+      if (!run.modelId.startsWith("hf:") && !run.modelId.startsWith("or:")) {
+        setValues((old) => ({ ...old, prompt: run.prompt }))
+        setError(
+          "Prompt reused. Choose a current API model and review its settings before generating."
+        )
+        return
+      }
+      const saved = { ...run.settings }
+      delete saved.aspectRatio
+      lastModel.current = run.modelId
+      setSelected(run.modelId)
+      setValues(saved)
+      setInvalid({})
+      setFormRevision((revision) => revision + 1)
+      setError("")
+    },
+    [abandonPresetLink]
+  )
   const review = runs.records.find(
     (run) => run.modelId === selected && run.errorKind === "provider_review"
   )
@@ -479,7 +509,9 @@ export function LiveStudio({ surface }: { surface: Surface }) {
         }
       />
     ) : null
-  const settings = ordered.filter(([key]) => key !== "prompt")
+  const settings = ordered.filter(
+    ([key]) => key !== "prompt" && key !== providerPreset.config?.field
+  )
   const mediaSettings = settings.filter(([key]) =>
     mediaFields.some((field) => field.key === key)
   )
@@ -498,6 +530,22 @@ export function LiveStudio({ surface }: { surface: Surface }) {
   const advancedSettings = parameterSettings.filter(
     (field) => !primarySettings.includes(field)
   )
+  const presetPicker = providerPreset.catalog ? (
+    <ProviderPresetPicker
+      key={`provider-picker:${current?.id}`}
+      catalog={providerPreset.catalog}
+      data={providerPreset.data}
+      value={providerPreset.selectedId}
+      onSelect={(preset) => {
+        if (providerPreset.config) fieldError(providerPreset.config.field, "")
+        providerPreset.choose(preset)
+      }}
+      onClear={() => {
+        if (providerPreset.config) fieldError(providerPreset.config.field, "")
+        providerPreset.clear()
+      }}
+    />
+  ) : null
   const modelPicker = (
     <Dialog open={modelPickerOpen} onOpenChange={setModelPickerOpen}>
       <DialogTrigger
@@ -569,6 +617,7 @@ export function LiveStudio({ surface }: { surface: Surface }) {
                 type="button"
                 aria-pressed={selected === model.id}
                 onClick={() => {
+                  providerPreset.abandonLink()
                   setSelected(model.id)
                   setError("")
                   setSearch("")
@@ -652,6 +701,20 @@ export function LiveStudio({ surface }: { surface: Surface }) {
   )
   const feedback = (
     <>
+      {((providerPreset.catalog === "marketing" &&
+        values.enhance_prompt === true) ||
+        providerPreset.catalog === "genjutsu") && (
+        <p className="mx-3 mt-1 text-[11px] text-white/55">
+          {providerPreset.catalog === "marketing"
+            ? "Add your product as the first image. The optional second image is a model reference."
+            : "Upload a video at least 4 seconds long. Only its first 30 seconds are used."}
+        </p>
+      )}
+      {providerPreset.notice && (
+        <p className="mx-3 mt-1 text-[11px] text-white/60" role="status">
+          {providerPreset.notice}
+        </p>
+      )}
       {price.status === "variable" && price.allowUsagePrice && (
         <label className="mx-3 flex items-start gap-2 rounded-lg bg-page px-3 py-2 text-xs text-white/70">
           <input
@@ -794,6 +857,7 @@ export function LiveStudio({ surface }: { surface: Surface }) {
               onClick={() => {
                 const model = workflowModel(models, workflow, current?.family)
                 if (model && model.id !== selected) {
+                  providerPreset.abandonLink()
                   setSelected(model.id)
                   setError("")
                 }
@@ -818,6 +882,7 @@ export function LiveStudio({ surface }: { surface: Surface }) {
         </div>
         <div className="flex flex-col gap-3 p-3 md:min-h-0 md:flex-1 md:overflow-y-auto">
           {modelPicker}
+          {presetPicker}
           {!!mediaSettings.length && (
             <section
               className="grid grid-cols-2 gap-3"
@@ -902,6 +967,7 @@ export function LiveStudio({ surface }: { surface: Surface }) {
               {promptControl}
               <PromptBox.Actions className="flex-wrap items-end">
                 {modelPicker}
+                {presetPicker}
                 {mediaSettings.map((field) => (
                   <div key={`upload:${field[0]}`} className="min-w-0">
                     {renderField(field, true, true)}

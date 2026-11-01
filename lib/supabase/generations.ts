@@ -3,6 +3,7 @@ import { createHash } from "node:crypto"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import { isSubscriptionEdition } from "@/lib/edition"
 import { quoteOpenRouterInput } from "@/lib/openrouter/catalog"
+import { validateProviderPresetSelection } from "@/lib/higgsfield/presets"
 import {
   OpenRouterError,
   AmbiguousOpenRouterError,
@@ -98,13 +99,25 @@ export async function prepareUserGeneration(
 
 type Prepared = Awaited<ReturnType<typeof prepareUserGeneration>>
 type Input = ReturnType<typeof submitSchema.parse>
-async function requestQuote(userId: string, input: Input, prepared: Prepared) {
+async function requestQuote(
+  userId: string,
+  input: Input,
+  prepared: Prepared,
+  pinned?: Awaited<ReturnType<typeof clientForConnection>>
+) {
   if (input.modelId.startsWith("or:")) {
     return quoteOpenRouterInput(input.modelId, prepared.request.body)
   }
-  const connection = isSubscriptionEdition()
-    ? await platformHiggsfieldClient()
-    : await clientForConnection(userId)
+  const connection =
+    pinned ??
+    (isSubscriptionEdition()
+      ? await platformHiggsfieldClient()
+      : await clientForConnection(userId))
+  await validateProviderPresetSelection(
+    connection.client,
+    prepared.request.path,
+    prepared.request.body
+  )
   return quoteGenerationCost(
     userId,
     connection.client,
@@ -193,7 +206,19 @@ export async function submitUserGeneration(userId: string, raw: unknown) {
   const { model, media, plane, request } = prepared
   const openRouter = input.modelId.startsWith("or:")
   const subscription = isSubscriptionEdition()
-  const providerQuote = await requestQuote(userId, input, prepared)
+  // Keep account-specific preset membership, price and paid submission on the
+  // same connection, even if the saved key changes while this request runs.
+  const hf = !openRouter
+    ? subscription
+      ? await platformHiggsfieldClient()
+      : await clientForConnection(userId)
+    : null
+  const providerQuote = await requestQuote(
+    userId,
+    input,
+    prepared,
+    hf ?? undefined
+  )
   const providerUsd = providerQuote?.usd ?? null
   const retail = subscription
     ? await quoteSubscriptionCost(
@@ -257,16 +282,13 @@ export async function submitUserGeneration(userId: string, raw: unknown) {
     preset_id: input.presetId ?? null,
     provider: openRouter ? "openrouter" : "higgsfield",
   }
-  const hf = !openRouter
-    ? subscription
-      ? await platformHiggsfieldClient()
-      : await clientForConnection(userId)
-    : null
   const or = openRouter
     ? subscription
       ? await platformOpenRouterClient()
       : await clientForOpenRouter(userId)
     : null
+  if (hf)
+    await validateProviderPresetSelection(hf.client, request.path, request.body)
   let queued: { id: string; created: boolean }
   if (subscription && retail)
     queued = await startSubscriptionGeneration(

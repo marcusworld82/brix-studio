@@ -3,6 +3,7 @@ const user = "11111111-1111-4111-8111-111111111111",
   id = "22222222-2222-4222-8222-222222222222",
   pin = "33333333-3333-4333-8333-333333333333"
 const mocks = vi.hoisted(() => ({
+  validatePreset: vi.fn(),
   personalHF: vi.fn(),
   personalOR: vi.fn(),
   platformHF: vi.fn(),
@@ -84,6 +85,9 @@ vi.mock("@/lib/supabase/live-input", () => ({
 vi.mock("@/lib/supabase/generation-cost", () => ({
   quoteGenerationCost: mocks.hfQuote,
 }))
+vi.mock("@/lib/higgsfield/presets", () => ({
+  validateProviderPresetSelection: mocks.validatePreset,
+}))
 vi.mock("@/lib/openrouter/catalog", () => ({
   quoteOpenRouterInput: mocks.orQuote,
 }))
@@ -130,6 +134,7 @@ const input = (modelId = "hf:test") => ({
 })
 beforeEach(() => {
   vi.clearAllMocks()
+  mocks.validatePreset.mockResolvedValue(undefined)
   vi.stubEnv("APP_BACKEND", "supabase")
   vi.stubEnv("BRIX_EDITION", "subscription")
   vi.stubEnv("ADMIN_EMAILS", "owner@example.com")
@@ -204,6 +209,29 @@ beforeEach(() => {
   })
 })
 describe("subscription generation integration", () => {
+  it("rejects an unavailable preset before quoting, reserving credits or submitting", async () => {
+    mocks.validatePreset.mockRejectedValueOnce(
+      new Error("Select an available preset.")
+    )
+    await expect(submitUserGeneration(user, input())).rejects.toThrow(
+      /available preset/
+    )
+    expect(mocks.hfQuote).not.toHaveBeenCalled()
+    expect(mocks.start).not.toHaveBeenCalled()
+    expect(mocks.submit).not.toHaveBeenCalled()
+  })
+  it("checks the actual submit connection again before reserving credits", async () => {
+    mocks.validatePreset
+      .mockResolvedValueOnce(undefined)
+      .mockRejectedValueOnce(new Error("Preset was withdrawn."))
+    await expect(submitUserGeneration(user, input())).rejects.toThrow(
+      /withdrawn/
+    )
+    expect(mocks.hfQuote).toHaveBeenCalledTimes(1)
+    expect(mocks.validatePreset).toHaveBeenCalledTimes(2)
+    expect(mocks.start).not.toHaveBeenCalled()
+    expect(mocks.submit).not.toHaveBeenCalled()
+  })
   it("requires the fresh credit quote before reserving or paying a provider", async () => {
     await expect(
       submitUserGeneration(user, { ...input(), expectedCredits: 12 })
@@ -232,6 +260,7 @@ describe("subscription generation integration", () => {
   })
   it("pins the selected owner connection before the single paid submit", async () => {
     await submitUserGeneration(user, input())
+    expect(mocks.platformHF).toHaveBeenCalledTimes(1)
     expect(mocks.personalHF).not.toHaveBeenCalled()
     expect(mocks.updates[0]).toEqual({ platform_connection_id: pin })
     expect(mocks.submit).toHaveBeenCalledTimes(1)

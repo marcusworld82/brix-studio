@@ -6,6 +6,10 @@ import {
 } from "@/generation/upload-contract"
 import { isCompleteApiKey } from "./api-key"
 import { env } from "@/lib/env"
+import {
+  isProviderPresetCatalog,
+  type ProviderPresetCatalog,
+} from "./preset-types"
 
 import type {
   Estimate,
@@ -98,7 +102,8 @@ export function createHiggsfieldClient(options: ClientOptions) {
   async function once(
     method: "GET" | "POST",
     path: string,
-    body?: Record<string, unknown>
+    body?: Record<string, unknown>,
+    rejectRedirect = false
   ): Promise<{ status: number; payload: unknown; correlationId?: string }> {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), timeoutMs)
@@ -113,6 +118,7 @@ export function createHiggsfieldClient(options: ClientOptions) {
         ...(body ? { body: JSON.stringify(body) } : {}),
         signal: controller.signal,
         cache: "no-store",
+        ...(rejectRedirect ? { redirect: "error" as const } : {}),
       })
       const payload = await readJson(response)
       return {
@@ -157,6 +163,33 @@ export function createHiggsfieldClient(options: ClientOptions) {
   }
 
   return {
+    /** Authenticated metadata only, never a client-supplied upstream URL. */
+    async presetCatalogPage(
+      catalog: ProviderPresetCatalog,
+      cursor?: number
+    ): Promise<unknown> {
+      if (
+        !isProviderPresetCatalog(catalog) ||
+        (cursor !== undefined &&
+          (catalog !== "marketing" ||
+            !Number.isInteger(cursor) ||
+            cursor < 0 ||
+            cursor >= 1000))
+      )
+        throw new PlatformError(400, { detail: "Invalid preset catalog" })
+      const paths: Record<ProviderPresetCatalog, string> = {
+        marketing: `/marketing-studio/image/presets?size=50${cursor === undefined ? "" : `&cursor=${cursor}`}`,
+        genjutsu: "/models/higgsfield/genjutsu/restyle/v1.0/presets",
+        "soul-v2": "/v1/text2image/soul-styles/v2",
+        "soul-v1": "/v1/text2image/soul-styles",
+      }
+      const result = await once("GET", paths[catalog], undefined, true)
+      if (result.status < 200 || result.status >= 300)
+        throw new PlatformError(result.status, {
+          detail: "Preset catalog unavailable",
+        })
+      return result.payload
+    },
     /** POST /{path}. Retries only answers that prove nothing was created. */
     async submit(
       path: string,

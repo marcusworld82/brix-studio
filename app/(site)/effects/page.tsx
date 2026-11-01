@@ -1,11 +1,11 @@
 import type { Metadata } from "next"
 import Link from "next/link"
-import { Sparkles, Wand2 } from "lucide-react"
+import { Sparkles } from "lucide-react"
 
 import { Atmosphere } from "@/components/marketing/atmosphere"
 import { loadEffects } from "@/components/marketing/data"
 import { EffectsGallery } from "@/components/marketing/effects-gallery"
-import { EmptyCard } from "@/components/marketing/empty-card"
+import { ProviderPresetGallery } from "@/components/provider-presets/gallery"
 import { PRESET_CATEGORIES } from "@/lib/presets/seed-data"
 
 export const metadata: Metadata = {
@@ -29,7 +29,7 @@ export default async function EffectsPage() {
             href="/video"
             className="font-display inline-flex h-8 items-center gap-1.5 rounded-full bg-lime/15 px-3 text-[13px] text-lime shadow-[0_0_24px_rgba(5,130,202,0.25)] transition-colors hover:bg-lime/25"
           >
-            <Sparkles className="size-3.5" aria-hidden /> Try for free
+            <Sparkles className="size-3.5" aria-hidden /> Open video studio
           </Link>
           <h1
             id="effects-title"
@@ -38,8 +38,8 @@ export default async function EffectsPage() {
             Visual effects
           </h1>
           <p className="max-w-[560px] text-sm text-muted-foreground md:text-base">
-            Ready-made looks and camera moves. Pick one, describe your subject,
-            and the effect brings the lighting, lens and motion.
+            Browse your provider&apos;s video restyles and image styles, then
+            open a compatible model with the look selected.
           </p>
         </div>
       </section>
@@ -47,22 +47,19 @@ export default async function EffectsPage() {
         aria-label="Effects gallery"
         className="mx-auto w-full max-w-[1440px] px-4"
       >
-        {effects.length > 0 ? (
-          <EffectsGallery effects={effects} categories={PRESET_CATEGORIES} />
-        ) : (
-          <EmptyCard
-            icon={<Wand2 className="size-5" aria-hidden />}
-            title="Effects are warming up"
-            body="We couldn't load the effects library just now. You can still generate from a prompt."
-            action={
-              <Link
-                href="/video"
-                className="btn-keycap inline-flex h-10 items-center gap-2 rounded-[10px] px-4 text-sm font-semibold"
-              >
-                <Sparkles className="size-4" aria-hidden /> Open the generator
-              </Link>
-            }
-          />
+        <ProviderPresetGallery initialCatalog="genjutsu" />
+        {effects.length > 0 && (
+          <details className="mt-12 border-t border-white/10 pt-6">
+            <summary className="cursor-pointer text-sm font-medium text-white/60">
+              BRIX effects library
+            </summary>
+            <div className="mt-6">
+              <EffectsGallery
+                effects={effects}
+                categories={PRESET_CATEGORIES}
+              />
+            </div>
+          </details>
         )}
       </section>
     </div>

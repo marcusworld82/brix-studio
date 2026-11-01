@@ -39,6 +39,33 @@ export function publishedCost(
         }
       : null
   const resolution = String(body.resolution ?? "").toLowerCase()
+  // Restyle is missing from the public pricing feed. Its authenticated
+  // /estimate response supplies current list rates instead of a numeric total.
+  // Source rounding/trim contract:
+  // https://open.higgsfield.ai/models/higgsfield/genjutsu/restyle/v1.0/api-reference
+  if (path === "higgsfield/genjutsu/restyle/v1.0") {
+    const videos = media.filter((item) => item.kind === "video")
+    const seconds = videos[0]?.durationSec
+    if (
+      videos.length !== 1 ||
+      videos[0]?.role !== "source" ||
+      seconds === undefined ||
+      !Number.isFinite(seconds) ||
+      seconds < 4 ||
+      !/^Roughly costs \$\d+(?:\.\d+)? per second at 480p, \$\d+(?:\.\d+)? per second at 720p, or \$\d+(?:\.\d+)? per second at 1080p\.$/.test(
+        description.trim()
+      )
+    )
+      return null
+    const rates = [
+      ...description.matchAll(
+        /\$(\d+(?:\.\d+)?) per second at (480p|720p|1080p)\b/g
+      ),
+    ]
+    const matches = rates.filter((rate) => rate[2] === resolution)
+    if (rates.length !== 3 || matches.length !== 1) return null
+    return result(Math.ceil(Math.min(seconds, 30)) * Number(matches[0]![1]))
+  }
   if (path.startsWith("higgsfield/genjutsu/") || lightPaths.has(path)) {
     const light = lightPaths.has(path)
     const seconds = media.find(

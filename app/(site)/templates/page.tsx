@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 
 import { Atmosphere } from "@/components/marketing/atmosphere"
+import { ProviderPresetGallery } from "@/components/provider-presets/gallery"
 import { TemplatesView } from "@/components/templates/templates-view"
 import { currentUser } from "@/lib/auth/session"
 import {
@@ -45,11 +46,18 @@ export default async function TemplatesPage() {
             Templates
           </h1>
           <p className="max-w-[520px] text-sm text-muted-foreground md:text-base">
-            Start from a ready-made template, or save your own. One click loads
-            the model, prompt and settings into the generator.
+            Browse your current provider templates or return to your saved BRIX
+            templates. Choosing a look does not start generation.
           </p>
         </header>
-        <TemplatesView official={official} mine={mine} />
+        <ProviderPresetGallery initialCatalog="marketing" />
+        <section
+          className="mt-8 space-y-5 border-t border-white/10 pt-8"
+          aria-label="Saved BRIX templates"
+        >
+          <h2 className="text-xl font-medium">Saved BRIX templates</h2>
+          <TemplatesView official={official} mine={mine} />
+        </section>
       </div>
     </div>
   )

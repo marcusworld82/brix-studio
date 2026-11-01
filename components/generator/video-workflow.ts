@@ -10,7 +10,7 @@ export function videoWorkflow(path: string): VideoWorkflow | null {
     return "motion"
   if (
     parts.some((part) =>
-      ["video-edit", "video-to-video", "object-swap"].includes(part)
+      ["video-edit", "video-to-video", "object-swap", "restyle"].includes(part)
     )
   )
     return "edit"

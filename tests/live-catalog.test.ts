@@ -101,6 +101,71 @@ function goodFetch(url: string): Promise<Response> {
 }
 
 describe("public live model catalog", () => {
+  it("discovers the documented Restyle supplement only after verifying its current schema", async () => {
+    const path = "higgsfield/genjutsu/restyle/v1.0"
+    const detail = {
+      slug: path,
+      title: "Genjutsu Restyle",
+      availability_state: "available",
+      output_type: "video",
+      input_schema: {
+        type: "object",
+        required: ["video_url", "preset_id"],
+        properties: {
+          video_url: { type: "string", format: "uri" },
+          preset_id: { type: "string", format: "uuid" },
+        },
+      },
+      ui_schema: {},
+      pricing_description: "Roughly costs $0.681 per second at 720p.",
+    }
+    let time = 1000
+    let available = true
+    const client = createLiveCatalogClient({
+      now: () => time,
+      snapshot: empty,
+      fetcher: async (url) =>
+        url.includes(path)
+          ? new Response(
+              JSON.stringify(
+                available ? detail : { ...detail, availability_state: "hidden" }
+              )
+            )
+          : url.includes(CATALOG_PATH)
+            ? page([
+                {
+                  ...family,
+                  entry_points: [
+                    ...family.entry_points,
+                    {
+                      mode_id: "higgsfield/genjutsu/motion-transfer/v1.0",
+                      output_type: "video",
+                    },
+                  ],
+                },
+              ])
+            : goodFetch(url),
+    })
+    const first = await client.listLiveModels()
+    expect(first.models.find((entry) => entry.path === path)).toMatchObject({
+      id: `hf:${path}`,
+      surface: "video",
+    })
+    const model = await client.getLiveModel(`hf:${path}`)
+    expect(model).toMatchObject({
+      stale: false,
+      pricingDescription: detail.pricing_description,
+    })
+    expect(model?.pricing).toBeUndefined()
+    available = false
+    time += 301_000
+    expect(
+      (await client.listLiveModels()).models.some(
+        (entry) => entry.path === path
+      )
+    ).toBe(false)
+    expect(await client.getLiveModel(`hf:${path}`)).toBeNull()
+  })
   it("discovers and validates a new compatible model without a source catalog entry", async () => {
     const client = createLiveCatalogClient({
       fetcher: goodFetch,

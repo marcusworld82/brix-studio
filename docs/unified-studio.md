@@ -95,3 +95,36 @@ cleanup, no workspace mode switch, responsive bottom controls, private reference
 ownership, admin denial for regular accounts, and server-side manual price units.
 Do not spend provider credits or run real card transactions during these checks.
 Live database activation is a separate check from a passing local migration test.
+
+## Live provider preset galleries
+
+Both editions expose the Marketing image templates, Genjutsu Restyle styles,
+Soul 2 styles and original Soul styles returned by the connected API account.
+`GET /api/provider-presets?catalog=marketing|genjutsu|soul-v2|soul-v1` is
+authenticated, private and not cached across accounts. Marketing pagination must
+complete before returning a list. Counts and preview metadata come from the
+provider rather than a seeded database or a fixed list of UUIDs.
+
+Personal requests use the signed-in user's encrypted Higgsfield connection.
+Subscription requests use the studio's configured provider connection. Choosing
+a preset loads the matching model and its current input controls, never submits
+a generation, and does not turn a preview image into a generation reference.
+The UUID must remain in the matching live catalog before quoting and before
+reserving credits or submitting. Required media and existing price gates remain
+in force. Each submission pins one provider connection for membership checks,
+its fresh account-specific quote and the paid request, even if the saved key
+changes during that submission.
+
+The Marketing gallery opens the explicitly named 2.0 Alpha model by default,
+which supports the same preset catalog and currently returns numeric account
+quotes. Flare and Sunburst retain their own model entries and preset picker;
+their existing token-price limitations above still apply. No model is silently
+substituted after a user chooses it, and no tested sample quote is a fixed rate.
+
+Genjutsu Restyle is currently absent from Higgsfield's main public catalog and
+pricing feeds. Its model is exposed only after validating the available public
+model schema. Its authenticated estimate returns current approximate list rates
+as text. BRIX uses the verified source-video duration, rounds billable seconds
+up, caps at the documented 30 second trim, and labels the result as an estimate.
+Unknown rates, source duration or unsupported changes fail closed. No fixed
+discount or exact total is invented.
