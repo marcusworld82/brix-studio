@@ -52,6 +52,7 @@ import {
   liveFieldDisplay,
   orderLiveFields,
   visibleFieldErrors,
+  mediaLimitMessage,
 } from "./live-field-display"
 import { videoWorkflow, workflowModel } from "./video-workflow"
 import { validateLiveShotTimeline } from "@/generation/catalog/shot-timeline"
@@ -229,16 +230,15 @@ export function LiveStudio({ surface }: { surface: Surface }) {
   )
   const mediaProblems = mediaFields.flatMap((field) => {
     const count = readLiveMediaUrls(field, values[field.key]).length
+    const label = current
+      ? liveFieldDisplay(current, field.key, field.raw, values).label
+      : field.name
     return count < field.minItems &&
       values[field.key] !== null &&
       (field.required || values[field.key] !== undefined)
-      ? [
-          `${field.name} requires at least ${field.minItems} ${field.kind} files.`,
-        ]
+      ? [mediaLimitMessage(label, field.kind, field.minItems, "minimum")]
       : field.maxItems !== null && count > field.maxItems
-        ? [
-            `${field.name} allows at most ${field.maxItems} ${field.kind} files.`,
-          ]
+        ? [mediaLimitMessage(label, field.kind, field.maxItems, "maximum")]
         : []
   })
   if (totalReferences > LIVE_REFERENCE_APP_LIMIT)
@@ -433,7 +433,11 @@ export function LiveStudio({ surface }: { surface: Surface }) {
           ? "Usage pricing"
           : "Price pending"
   const canvasView = canvasChoice ?? (items.length ? "history" : "how")
-  const renderField = ([key, raw]: [string, unknown], compact = false) =>
+  const renderField = (
+    [key, raw]: [string, unknown],
+    compact = false,
+    mediaButtonOnly = false
+  ) =>
     record(raw) ? (
       <LiveField
         key={`${current?.id}:${formRevision}:${key}`}
@@ -461,6 +465,7 @@ export function LiveStudio({ surface }: { surface: Surface }) {
         mediaField={mediaFields.find((field) => field.key === key)}
         totalReferences={totalReferences}
         compact={compact}
+        mediaButtonOnly={mediaButtonOnly}
         onSignIn={() => openAuth({ mode: "signup" })}
         shotTotal={
           current?.path.startsWith("kling-video/v3.0/") &&
@@ -587,7 +592,7 @@ export function LiveStudio({ surface }: { surface: Surface }) {
   const promptControl = current ? (
     <LiveReferencePrompt
       key={`prompt:${current.id}`}
-      showAttached={false}
+      showAttached={surface === "image"}
       rows={surface === "video" ? 3 : 2}
       pickerInline={surface === "video"}
       fields={visibleMediaFields}
@@ -890,21 +895,14 @@ export function LiveStudio({ surface }: { surface: Surface }) {
             aria-label="Image generation controls"
           >
             <PromptBox.Body>
-              {!!mediaSettings.length && (
-                <section
-                  className="flex max-h-[20dvh] min-w-0 flex-wrap gap-3 overflow-y-auto"
-                  aria-label="Image reference inputs"
-                >
-                  {mediaSettings.map((field) => (
-                    <div className="max-w-full min-w-0" key={field[0]}>
-                      {renderField(field, true)}
-                    </div>
-                  ))}
-                </section>
-              )}
               {promptControl}
               <PromptBox.Actions className="flex-wrap items-end">
                 {modelPicker}
+                {mediaSettings.map((field) => (
+                  <div key={`upload:${field[0]}`} className="min-w-0">
+                    {renderField(field, true, true)}
+                  </div>
+                ))}
                 {primarySettings.map((field) => (
                   <div className="max-w-[170px] min-w-0" key={field[0]}>
                     {renderField(field, true)}
@@ -951,6 +949,7 @@ function LiveField({
   mediaField,
   totalReferences,
   compact = false,
+  mediaButtonOnly = false,
   onSignIn,
   shotTotal,
 }: {
@@ -965,6 +964,7 @@ function LiveField({
   mediaField?: LiveMediaField
   totalReferences: number
   compact?: boolean
+  mediaButtonOnly?: boolean
   onSignIn: () => void
   shotTotal?: number
 }) {
@@ -994,6 +994,58 @@ function LiveField({
   const remaining = isArray
     ? Math.max(0, effectiveMax - urls.length)
     : effectiveMax
+  const selectMedia = (
+    picked: import("@/lib/studio/uploads").AssetSelection[]
+  ) => {
+    const selected = isArray
+      ? [
+          ...urls,
+          ...picked
+            .filter((item) => item.kind === mediaKind)
+            .map((item) => item.src),
+        ]
+          .filter(
+            (url, index, all) =>
+              all.findIndex(
+                (candidate) =>
+                  referenceIdentity(candidate) === referenceIdentity(url)
+              ) === index
+          )
+          .slice(0, effectiveMax)
+      : picked.slice(0, 1).map((item) => item.src)
+    onChange(encodeLiveMediaUrls(mediaField!, selected))
+  }
+  if (media && mediaButtonOnly) {
+    const count = `${urls.length}/${mediaField!.maxItems ?? `${LIVE_REFERENCE_APP_LIMIT} studio`}`
+    const trigger = (
+      <PromptBox.Pill
+        start={<Plus />}
+        disabled={signedIn && !remaining}
+        aria-label={`Add ${label}, ${count}`}
+        title={
+          mediaField!.maxItems === null
+            ? `Provider maximum not published. Studio safety limit: ${LIVE_REFERENCE_APP_LIMIT} total references.`
+            : `${label}: ${count}`
+        }
+        onClick={signedIn ? undefined : onSignIn}
+      >
+        {label} <span className="text-white/45">{count}</span>
+      </PromptBox.Pill>
+    )
+    return signedIn ? (
+      <AssetLibraryModal
+        items={library}
+        accept={[mediaKind!]}
+        maxSelections={Math.max(1, remaining)}
+        excludeIds={isArray ? urls : []}
+        onUpload={uploadAsset}
+        onSelectMany={selectMedia}
+        trigger={trigger}
+      />
+    ) : (
+      trigger
+    )
+  }
   if (media) {
     const selections = urls.map((src, index) => ({
       id: src,
@@ -1106,26 +1158,7 @@ function LiveField({
                 setUploading(false)
               }
             }}
-            onSelectMany={(picked) => {
-              const selected = isArray
-                ? [
-                    ...urls,
-                    ...picked
-                      .filter((item) => item.kind === mediaKind)
-                      .map((item) => item.src),
-                  ]
-                    .filter(
-                      (url, index, all) =>
-                        all.findIndex(
-                          (candidate) =>
-                            referenceIdentity(candidate) ===
-                            referenceIdentity(url)
-                        ) === index
-                    )
-                    .slice(0, effectiveMax)
-                : picked.slice(0, 1).map((item) => item.src)
-              onChange(encodeLiveMediaUrls(mediaField!, selected))
-            }}
+            onSelectMany={selectMedia}
             trigger={
               <button
                 disabled={uploading || !remaining}

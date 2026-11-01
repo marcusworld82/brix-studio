@@ -82,3 +82,12 @@ export function visibleFieldErrors(
     )
   )
 }
+
+export function mediaLimitMessage(
+  label: string,
+  kind: string,
+  count: number,
+  limit: "minimum" | "maximum"
+) {
+  return `${label}: ${limit === "minimum" ? "add at least" : "maximum"} ${count} ${kind} ${count === 1 ? "file" : "files"}.`
+}

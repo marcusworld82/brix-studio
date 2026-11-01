@@ -3,6 +3,7 @@ import {
   liveFieldDisplay,
   orderLiveFields,
   visibleFieldErrors,
+  mediaLimitMessage,
 } from "@/components/generator/live-field-display"
 import {
   videoWorkflow,
@@ -127,6 +128,14 @@ describe("provider-specific inline presentation", () => {
         { preset_id: "Invalid JSON", seed: "Invalid value" }
       )
     ).toEqual({ seed: "Invalid value" })
+  })
+  it("names the displayed media role and uses singular or plural file text", () => {
+    expect(mediaLimitMessage("First frame", "image", 1, "minimum")).toBe(
+      "First frame: add at least 1 image file."
+    )
+    expect(mediaLimitMessage("Reference images", "image", 16, "maximum")).toBe(
+      "Reference images: maximum 16 image files."
+    )
   })
 })
 
