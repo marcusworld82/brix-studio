@@ -35,6 +35,12 @@ importers:
       '@tanstack/react-virtual':
         specifier: ^3.14.13
         version: 3.14.13(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      ajv:
+        specifier: '8'
+        version: 8.20.0
+      ajv-formats:
+        specifier: '3'
+        version: 3.0.1(ajv@8.20.0)
       class-variance-authority:
         specifier: ^0.7.1
         version: 0.7.1

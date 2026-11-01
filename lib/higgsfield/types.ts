@@ -36,4 +36,4 @@ export type UploadTicket = {
   upload_headers: Record<string, string>
 }
 
-export type Estimate = { credits: number; usd: number }
+export type Estimate = { credits: number; usd: number; discountUsd?: number }

@@ -1,0 +1,13 @@
+.git
+.env*
+.vercel
+.next
+node_modules
+.data
+_research
+_reference
+coverage
+playwright-report
+test-results
+release
+*.tsbuildinfo

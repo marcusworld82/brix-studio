@@ -1,5 +1,15 @@
 # BRIX studio
 
+Two editions now share this codebase. Personal uses each customer's Higgsfield API key and private Supabase backend. Subscription is a frontend demo only at `/subscription`, with no real billing or generation.
+
+- Setup: [Personal edition](docs/personal-edition-setup.md), [Subscription integration](docs/subscription-integration.md).
+- Customer packages: `pnpm editions:export --out /tmp/brix-delivery`.
+- Brand name, initial mark, accent and support address are environment settings.
+- Live model schemas refresh every five minutes; public pricing refreshes every minute. Current request quotes use the connected API key. Newly compatible models appear without manual source changes.
+- Description-only provider prices use verified supported formulas labeled “Est.”. Unsupported formulas or stale schemas block paid submission. Public maximum discounts are never assumed to apply to an account.
+- Some advanced model inputs use JSON controls. A provider API contract change can still require a software update.
+
+
 BRIX uses verified email and password accounts and each user's Higgsfield API key and API balance.
 Set APP_BACKEND=supabase for the full studio. Supabase provides authentication,
 Postgres, and private media storage. Resend sends login emails from a verified domain.

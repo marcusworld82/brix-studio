@@ -1,6 +1,8 @@
 import type { Metadata } from "next"
 import { Suspense } from "react"
 
+import { AutomaticStudio } from "@/components/generator/live-studio"
+import { isSupabaseBackend } from "@/lib/backend"
 import { GeneratorView } from "@/components/generator/generator-view"
 import { listPresets, type PresetView } from "@/lib/presets"
 
@@ -21,7 +23,13 @@ async function presets(): Promise<PresetView[]> {
 export default async function VideoPage() {
   return (
     <Suspense>
-      <GeneratorView surface="video" presets={await presets()} />
+      {isSupabaseBackend() ? (
+        <AutomaticStudio surface="video">
+          <GeneratorView surface="video" presets={await presets()} />
+        </AutomaticStudio>
+      ) : (
+        <GeneratorView surface="video" presets={await presets()} />
+      )}
     </Suspense>
   )
 }

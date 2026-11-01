@@ -5,6 +5,9 @@ import type { SubmitInput } from "@/lib/generations/submit"
 type Quote = {
   key: string
   status: "idle" | "loading" | "ready" | "error" | "variable"
+  estimated?: boolean
+  explanation?: string
+  discountUsd?: number
   usd: number | null
   error?: string
 }
@@ -22,9 +25,16 @@ export function useApiPrice(
   })
   useEffect(() => {
     const update = () => setRefresh((v) => v + 1)
+    if (!enabled) return
+    const timer = setInterval(update, 60_000)
     window.addEventListener(BALANCE_EVENT, update)
-    return () => window.removeEventListener(BALANCE_EVENT, update)
-  }, [])
+    window.addEventListener("focus", update)
+    return () => {
+      clearInterval(timer)
+      window.removeEventListener(BALANCE_EVENT, update)
+      window.removeEventListener("focus", update)
+    }
+  }, [enabled])
   useEffect(() => {
     if (!enabled || !input) return
     const controller = new AbortController()
@@ -51,6 +61,13 @@ export function useApiPrice(
             key,
             status: data.status === "ready" ? "ready" : "variable",
             usd: data.status === "ready" ? data.usd : null,
+            estimated: data.estimated === true,
+            explanation:
+              typeof data.explanation === "string"
+                ? data.explanation
+                : undefined,
+            discountUsd:
+              typeof data.discountUsd === "number" ? data.discountUsd : 0,
             error: data.description,
           })
       } catch (error) {

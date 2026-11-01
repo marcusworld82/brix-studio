@@ -1,15 +1,13 @@
 import "server-only"
+import { prepareLiveUserGeneration } from "./live-input"
+import { quoteGenerationCost } from "./generation-cost"
 import { z } from "zod"
 import { findModel, parseSettings } from "@/generation/catalog"
 import { groupMedia, inferInputMode } from "@/generation/catalog/media-inputs"
 import { mediaKindFromMime } from "@/generation/upload-contract"
 import { toPlatform } from "@/generation/to-platform"
 import { submitSchema } from "@/lib/generations/submit"
-import {
-  AmbiguousSubmitError,
-  EstimateDescriptionError,
-  PlatformError,
-} from "@/lib/higgsfield/client"
+import { AmbiguousSubmitError, PlatformError } from "@/lib/higgsfield/client"
 import { webhookUrlFor } from "@/lib/higgsfield/webhook"
 import { enforceRateLimit } from "@/lib/rate-limit"
 import { UserFacingError } from "@/lib/errors"
@@ -41,6 +39,8 @@ export async function prepareUserGeneration(
   userId: string,
   input: ReturnType<typeof submitSchema.parse>
 ) {
+  if (input.modelId.startsWith("hf:"))
+    return prepareLiveUserGeneration(userId, input)
   const client = createSupabaseServiceClient()
   const model = findModel(input.modelId)
   if (!model) throw new UserFacingError("Unknown model.")
@@ -81,25 +81,30 @@ export async function prepareUserGeneration(
 export async function estimateUserGeneration(userId: string, raw: unknown) {
   const input = submitSchema.parse(raw)
   await enforceRateLimit(`estimate:${userId}`, 120, 60)
-  const { request } = await prepareUserGeneration(userId, input)
+  const { request, media } = await prepareUserGeneration(userId, input)
   const connection = await clientForConnection(userId)
   try {
-    const result = await connection.client.estimate(request.path, request.body)
-    return {
-      status: "ready" as const,
-      usd: result.usd,
-      currency: "USD" as const,
-      quotedAt: Date.now(),
-    }
+    const result = await quoteGenerationCost(
+      userId,
+      connection.client,
+      request,
+      media
+    )
+    return result
+      ? {
+          status: "ready" as const,
+          ...result,
+          currency: "USD" as const,
+          quotedAt: Date.now(),
+        }
+      : {
+          status: "variable" as const,
+          usd: null,
+          currency: "USD" as const,
+          description:
+            "Higgsfield cannot price these inputs yet. Check the model inputs or use another model.",
+        }
   } catch (caught) {
-    if (caught instanceof EstimateDescriptionError)
-      return {
-        status: "variable" as const,
-        usd: null,
-        currency: "USD" as const,
-        description:
-          "Higgsfield does not return a fixed dollar price for this configuration.",
-      }
     throw new UserFacingError(providerMessage(caught))
   }
 }
@@ -122,11 +127,15 @@ export async function submitUserGeneration(userId: string, raw: unknown) {
   const connection = await clientForConnection(userId)
   let estimate: number | null = null
   try {
-    estimate = (await connection.client.estimate(request.path, request.body))
-      .usd
+    const quote = await quoteGenerationCost(
+      userId,
+      connection.client,
+      request,
+      media
+    )
+    estimate = quote?.usd ?? null
   } catch (caught) {
-    if (!(caught instanceof EstimateDescriptionError))
-      throw new UserFacingError(providerMessage(caught))
+    throw new UserFacingError(providerMessage(caught))
   }
   if (estimate === null)
     throw new UserFacingError(

@@ -47,7 +47,7 @@ import type { GenerationView } from "./view"
 export const submitSchema = z.object({
   expectedUsd: z.number().finite().nonnegative().optional(),
   submitKey: z.uuid({ message: "Invalid submission." }),
-  modelId: z.string().min(1).max(80),
+  modelId: z.string().min(1).max(220),
   prompt: z.string().max(12_000, "That prompt is too long."),
   settings: z.record(z.string(), z.unknown()).default({}),
   media: z

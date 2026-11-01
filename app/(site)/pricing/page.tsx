@@ -1,3 +1,4 @@
+import { LivePricing } from "@/components/billing/live-pricing"
 import type { Metadata } from "next"
 import Link from "next/link"
 import type { ReactNode } from "react"
@@ -116,27 +117,7 @@ const FAQ: { q: string; a: ReactNode }[] = [
 ]
 
 export default function PricingPage() {
-  if (isSupabaseBackend())
-    return (
-      <div className="studio-backdrop mx-auto flex max-w-4xl flex-col gap-6 px-6 py-16">
-        <h1 className="font-display text-5xl">Your key. Your API balance.</h1>
-        <p className="text-lg text-muted-foreground">
-          Sign in with email, connect your Higgsfield API key, then create
-          images and videos from this studio.
-        </p>
-        <p>
-          Higgsfield charges your API account for generation. BRIX does not
-          debit studio generation credits in this setup. A Higgsfield
-          subscription login is not needed.
-        </p>
-        <Link
-          href="/account"
-          className="btn-keycap flex h-12 w-fit items-center rounded-xl px-6 font-semibold"
-        >
-          Connect your API key
-        </Link>
-      </div>
-    )
+  if (isSupabaseBackend()) return <LivePricing />
   return (
     <div className="relative isolate">
       <Atmosphere glow="top" className="-z-10 h-[520px]" />

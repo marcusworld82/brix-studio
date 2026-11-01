@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next"
+import type { CSSProperties } from "react"
 import { IBM_Plex_Mono, Inter, Space_Grotesk } from "next/font/google"
 import { unstable_rethrow } from "next/navigation"
 
@@ -39,6 +40,8 @@ const plexMono = IBM_Plex_Mono({
   display: "swap",
 })
 
+export const dynamic = "force-dynamic"
+
 export const metadata: Metadata = {
   metadataBase: new URL(env().APP_URL),
   title: {
@@ -72,6 +75,12 @@ async function bootstrap(): Promise<{
   credits: number | null
   pricing: ClientPricing
 }> {
+  if (process.env.BRIX_EDITION === "subscription")
+    return {
+      user: null,
+      credits: null,
+      pricing: { mode: "credits", table: {}, disabled: [], fromPrices: {} },
+    }
   const pricing = await clientPricing()
   try {
     const user = await currentUser()
@@ -122,6 +131,14 @@ export default async function RootLayout({
     <html
       lang="en"
       data-theme="default-dark"
+      style={
+        {
+          "--hf-color-lime-500": BRAND.accent,
+          "--primary": BRAND.accent,
+          "--color-brix-main": BRAND.accent,
+          "--color-brix-second": BRAND.accent,
+        } as CSSProperties
+      }
       className={cn(
         "dark font-sans antialiased",
         spaceGrotesk.variable,
@@ -139,9 +156,13 @@ export default async function RootLayout({
         <AppProviders user={user} initialCredits={credits} pricing={pricing}>
           <MobileViewportGuard />
           {children}
-          <AuthModal />
-          <UpgradeModal />
-          <CookieConsent />
+          {process.env.BRIX_EDITION !== "subscription" ? (
+            <>
+              <AuthModal />
+              <UpgradeModal />
+              <CookieConsent />
+            </>
+          ) : null}
         </AppProviders>
       </body>
     </html>

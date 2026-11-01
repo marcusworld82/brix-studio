@@ -242,7 +242,7 @@ export function useGenerator(surface: Surface, presets: PresetView[] = []) {
   )
   const priceLabel = apiMode
     ? apiPrice.status === "ready" && apiPrice.usd !== null
-      ? formatUsd(apiPrice.usd)
+      ? `${apiPrice.estimated ? "Est. " : ""}${formatUsd(apiPrice.usd)}`
       : apiPrice.status === "loading"
         ? "Pricing…"
         : apiPrice.status === "variable"

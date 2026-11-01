@@ -19,7 +19,10 @@
     "pricing:sync": "tsx --conditions=react-server scripts/sync-pricing.ts",
     "mock:higgsfield": "tsx scripts/mock-higgsfield.ts",
     "email:dev": "email dev --dir emails",
-    "db:dev": "tsx scripts/dev-mongo.ts"
+    "db:dev": "tsx scripts/dev-mongo.ts",
+    "catalog:sync": "tsx --conditions=react-server scripts/sync-live-catalog.ts",
+    "setup:check": "tsx scripts/check-personal-setup.ts",
+    "editions:export": "node scripts/export-editions.mjs"
   },
   "dependencies": {
     "@auth/mongodb-adapter": "3.11.3",
@@ -31,6 +34,8 @@
     "@supabase/ssr": "0.12.7",
     "@supabase/supabase-js": "2.117.3",
     "@tanstack/react-virtual": "^3.14.13",
+    "ajv": "8",
+    "ajv-formats": "3",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.4.0",
     "lucide-react": "^1.48.0",
