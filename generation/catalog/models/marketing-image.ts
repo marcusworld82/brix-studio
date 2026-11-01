@@ -86,9 +86,10 @@ function marketingImage(path: string, label: string) {
 export const marketingImageFlare: ModelEntry = {
   ...meta,
   id: "marketing-image-flare",
-  label: "Marketing Image 2.5 Flare",
+  family: "GPT Image 2.5",
+  label: "GPT Image 2.5 Flare",
   description:
-    "Ad-ready visuals with crisp on-image text, from a prompt or up to 16 product and brand pictures.",
+    "GPT Image 2.5 Flare. Generate or edit with up to 16 reference images.",
   bestFor: "Product ads, banners and layouts with text",
   badges: ["TOP", "NEW", "4K"],
   category: "ADS",
@@ -100,16 +101,17 @@ export const marketingImageFlare: ModelEntry = {
   docs: [DOCS, `${DOCS}/flare`],
   toPlatform: marketingImage(
     "marketing-studio/image/flare",
-    "Marketing Image 2.5 Flare"
+    "GPT Image 2.5 Flare"
   ),
 }
 
 export const marketingImageSunburst: ModelEntry = {
   ...meta,
   id: "marketing-image-sunburst",
-  label: "Marketing Image 2.5 Sunburst",
+  family: "GPT Image 2.5",
+  label: "GPT Image 2.5 Sunburst",
   description:
-    "The Sunburst take on the 2.5 marketing model: the same controls and references, a different visual flavour.",
+    "GPT Image 2.5 Sunburst. Generate or edit with up to 16 reference images.",
   bestFor: "Alternate looks for campaign images",
   badges: ["NEW", "4K"],
   category: "ADS",
@@ -121,7 +123,7 @@ export const marketingImageSunburst: ModelEntry = {
   docs: [DOCS, `${DOCS}/sunburst`],
   toPlatform: marketingImage(
     "marketing-studio/image/sunburst",
-    "Marketing Image 2.5 Sunburst"
+    "GPT Image 2.5 Sunburst"
   ),
 }
 

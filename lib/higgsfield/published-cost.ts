@@ -8,9 +8,14 @@ export type PublishedCost = {
 }
 const money = (v: unknown) =>
   typeof v === "string" || typeof v === "number" ? Number(v) : NaN
+const lightPaths = new Set([
+  "higgsfield/genjutsu-light/motion-transfer/v1.0",
+  "higgsfield/genjutsu-light/object-swap/v1.0",
+])
 export function publishedFormulaSupported(path: string) {
   return (
     path.startsWith("higgsfield/genjutsu/") ||
+    lightPaths.has(path) ||
     path.startsWith("bytedance/seedance-") ||
     path === "higgsfield/cinema-studio/4.0"
   )
@@ -34,7 +39,8 @@ export function publishedCost(
         }
       : null
   const resolution = String(body.resolution ?? "").toLowerCase()
-  if (path.startsWith("higgsfield/genjutsu/")) {
+  if (path.startsWith("higgsfield/genjutsu/") || lightPaths.has(path)) {
+    const light = lightPaths.has(path)
     const seconds = media.find(
       (m) => m.kind === "video" && m.role === "source"
     )?.durationSec
@@ -42,8 +48,20 @@ export function publishedCost(
       !seconds ||
       !Number.isFinite(seconds) ||
       seconds <= 0 ||
-      seconds > 30 ||
+      (!light && seconds > 30) ||
       !pricing
+    )
+      return null
+    // Official app-models/{path}/ pricing_description, verified 2026-11-01:
+    // Light trims its source to 15s and rounds output up to whole seconds.
+    // Its current schema has no reference-video input. Refuse additional video
+    // media rather than silently omit the separately billable reference time.
+    // https://dash.higgsfield.ai/api/v2/app-models/higgsfield/genjutsu-light/motion-transfer/v1.0/
+    if (
+      light &&
+      (media.filter((m) => m.kind === "video").length !== 1 ||
+        !description.includes("trims the source to 15 seconds") ||
+        !description.includes("output duration is rounded up to whole seconds"))
     )
       return null
     const rates = pricing.options
@@ -64,7 +82,9 @@ export function publishedCost(
       new Set(rates).size !== 1
     )
       return null
-    return result(Math.ceil(seconds) * rates[0]!)
+    return result(
+      Math.ceil(light ? Math.min(seconds, 15) : seconds) * rates[0]!
+    )
   }
   // The provider explicitly gives approximate 16:9 per-second rates in these descriptions.
   // Do not extrapolate them to other ratios or video-reference billing.

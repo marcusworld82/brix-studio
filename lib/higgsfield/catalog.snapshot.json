@@ -3253,8 +3253,8 @@
       {
         "id": "hf:marketing-studio/image/flare",
         "path": "marketing-studio/image/flare",
-        "label": "Marketing Studio Image · 2.5 Flare",
-        "family": "Marketing Studio Image",
+        "label": "GPT Image 2.5 Flare",
+        "family": "GPT Image 2.5",
         "surface": "image",
         "description": "Create or edit campaign images with optional preset enhancement.",
         "pricing": {
@@ -3324,8 +3324,8 @@
       {
         "id": "hf:marketing-studio/image/sunburst",
         "path": "marketing-studio/image/sunburst",
-        "label": "Marketing Studio Image · 2.5 Sunburst",
-        "family": "Marketing Studio Image",
+        "label": "GPT Image 2.5 Sunburst",
+        "family": "GPT Image 2.5",
         "surface": "image",
         "description": "Create or edit campaign images with optional preset enhancement.",
         "pricing": {
@@ -15613,8 +15613,8 @@
     "hf:marketing-studio/image/flare": {
       "id": "hf:marketing-studio/image/flare",
       "path": "marketing-studio/image/flare",
-      "label": "Marketing Studio Image · 2.5 Flare",
-      "family": "Marketing Studio Image",
+      "label": "GPT Image 2.5 Flare",
+      "family": "GPT Image 2.5",
       "surface": "image",
       "description": "Create or edit campaign images with optional preset enhancement.",
       "pricing": {
@@ -15862,8 +15862,8 @@
     "hf:marketing-studio/image/sunburst": {
       "id": "hf:marketing-studio/image/sunburst",
       "path": "marketing-studio/image/sunburst",
-      "label": "Marketing Studio Image · 2.5 Sunburst",
-      "family": "Marketing Studio Image",
+      "label": "GPT Image 2.5 Sunburst",
+      "family": "GPT Image 2.5",
       "surface": "image",
       "description": "Create or edit campaign images with optional preset enhancement.",
       "pricing": {

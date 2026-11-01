@@ -34,7 +34,7 @@ export function GeneratorView({
         No {surface} models are available right now.
       </div>
     )
-  return surface === "image" ? (
+  return surface !== "audio" ? (
     <ImageLayout generator={generator} />
   ) : (
     <PanelLayout generator={generator} />

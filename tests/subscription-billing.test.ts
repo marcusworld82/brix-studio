@@ -51,6 +51,7 @@ beforeAll(async () => {
     "202611010001_openrouter.sql",
     "202611010002_subscription.sql",
     "202611010003_platform_connections.sql",
+    "202611010004_manual_model_prices.sql",
   ]) {
     await database.exec(
       await readFile(
@@ -59,6 +60,15 @@ beforeAll(async () => {
       )
     )
   }
+  await database.query("select public.brix_subscription_pricing($1)", [
+    {
+      markupPercent: 30,
+      creditUsd: 0.01,
+      modelMarkups: {},
+      fixedCredits: { test: 13 },
+      rateUnits: { test: "generation" },
+    },
+  ])
   await database.query("insert into auth.users(id) values ($1), ($2)", [
     owner,
     other,
@@ -97,6 +107,8 @@ async function quote() {
     providerUsd: 0.1,
     modelId: "test",
     priceVersion: q.rows[0].version,
+    unit: "generation",
+    quantity: 1,
   }
 }
 async function reserve() {
@@ -210,12 +222,12 @@ describe("subscription credit integrity", () => {
         "select public.brix_start_subscription_generation($1,$2,$3,$4)",
         [
           owner,
-          { ...job, submit_key: other },
+          { ...job, model_id: "unpriced", submit_key: other },
           {},
-          { ...(await quote()), providerUsd: null },
+          { ...(await quote()), modelId: "unpriced", providerUsd: null },
         ]
       )
-    ).rejects.toThrow(/admin credit price/)
+    ).rejects.toThrow(/customer price/)
   })
   it("old events cannot regress a canceled subscription", async () => {
     const payload = {
@@ -452,6 +464,165 @@ describe("trusted plan concurrency", () => {
   })
 })
 
+describe("manual per-model rate billing", () => {
+  it("scales by verified batch size and seconds and rejects tampered quantity", async () => {
+    const uid = randomUUID()
+    await database.query("insert into auth.users(id) values($1)", [uid])
+    await database.query(
+      "select public.brix_subscription_account($1,'cus_units')",
+      [uid]
+    )
+    await database.query("select public.brix_subscription_stripe_event($1)", [
+      {
+        userId: uid,
+        customerId: "cus_units",
+        eventId: "evt_unitfund",
+        eventCreated: 500,
+        plan: "ultra",
+        status: "active",
+        subscriptionId: "sub_units",
+        credits: 100,
+        bucket: "topup",
+        reference: "checkout:unitfund",
+      },
+    ])
+    const settings = {
+      markupPercent: 999,
+      creditUsd: 0.01,
+      modelMarkups: { unpriced: 900 },
+      fixedCredits: { test: 3 },
+      rateUnits: { test: "image" },
+    }
+    await database.query("select public.brix_subscription_pricing($1)", [
+      settings,
+    ])
+    const unitJob = { ...job, submit_key: randomUUID() }
+    const q = { ...(await quote()), unit: "image", quantity: 4, credits: 12 }
+    await database.query(
+      "select public.brix_start_subscription_generation($1,$2,$3,$4)",
+      [uid, unitJob, { batch_size: 4 }, q]
+    )
+    await expect(
+      database.query(
+        "select public.brix_start_subscription_generation($1,$2,$3,$4)",
+        [
+          uid,
+          { ...job, submit_key: randomUUID() },
+          { batch_size: 4 },
+          { ...q, quantity: 1, credits: 3 },
+        ]
+      )
+    ).rejects.toThrow(/Price changed/)
+    await expect(
+      database.query(
+        "select public.brix_start_subscription_generation($1,$2,$3,$4)",
+        [
+          uid,
+          { ...job, submit_key: randomUUID(), model_id: "unpriced" },
+          {},
+          { ...q, modelId: "unpriced" },
+        ]
+      )
+    ).rejects.toThrow(/set a customer price/)
+    await database.query("select public.brix_subscription_pricing($1)", [
+      { ...settings, rateUnits: { test: "second" } },
+    ])
+    const secondsQuote = {
+      ...(await quote()),
+      unit: "second",
+      quantity: 10,
+      credits: 30,
+    }
+    await database.query(
+      "select public.brix_start_subscription_generation($1,$2,$3,$4)",
+      [
+        uid,
+        { ...job, surface: "video", submit_key: randomUUID() },
+        { duration: 10 },
+        secondsQuote,
+      ]
+    )
+    await expect(
+      database.query(
+        "select public.brix_start_subscription_generation($1,$2,$3,$4)",
+        [
+          uid,
+          { ...job, surface: "video", submit_key: randomUUID() },
+          {},
+          { ...secondsQuote },
+        ]
+      )
+    ).rejects.toThrow(/explicit duration/)
+    await expect(
+      database.query(
+        "select public.brix_start_subscription_generation($1,$2,$3,$4)",
+        [
+          uid,
+          { ...job, surface: "video", submit_key: randomUUID() },
+          { duration: 10, seconds: 20 },
+          secondsQuote,
+        ]
+      )
+    ).rejects.toThrow(/quantity is unclear/)
+    await expect(
+      database.query(
+        "select public.brix_start_subscription_generation($1,$2,$3,$4)",
+        [
+          uid,
+          { ...job, surface: "video", submit_key: randomUUID() },
+          { duration: 1.00000000000001 },
+          { ...secondsQuote, quantity: 1.00000000000001, credits: 4 },
+        ]
+      )
+    ).rejects.toThrow(/three decimal places/)
+    await database.query(
+      "select public.brix_start_subscription_generation($1,$2,$3,$4)",
+      [
+        uid,
+        { ...job, surface: "video", submit_key: randomUUID() },
+        { duration: 1.001 },
+        { ...secondsQuote, quantity: 1.001, credits: 4 },
+      ]
+    )
+    expect(
+      (
+        await database.query<{ topup: number }>(
+          "select topup from brix_private.billing_accounts where user_id=$1",
+          [uid]
+        )
+      ).rows[0].topup
+    ).toBe(54)
+  })
+  it("rejects edits from an old admin tab without losing current prices", async () => {
+    const settings = {
+      markupPercent: 30,
+      creditUsd: 0.01,
+      modelMarkups: {},
+      fixedCredits: { test: 9 },
+      rateUnits: { test: "generation" },
+    }
+    await database.query("select public.brix_subscription_pricing($1)", [
+      settings,
+    ])
+    const oldVersion = (await quote()).priceVersion
+    await database.query("select public.brix_subscription_pricing($1)", [
+      { ...settings, fixedCredits: { test: 11 } },
+    ])
+    await expect(
+      database.query("select public.brix_subscription_pricing($1)", [
+        { ...settings, expectedVersion: oldVersion },
+      ])
+    ).rejects.toThrow(/another tab/)
+    expect(
+      (
+        await database.query<{ credits: number }>(
+          "select (fixed_credits->>'test')::integer as credits from brix_private.subscription_pricing"
+        )
+      ).rows[0].credits
+    ).toBe(11)
+  })
+})
+
 const stripeMocks = vi.hoisted(() => ({
   listLineItems: vi.fn(),
   list: vi.fn(),
@@ -570,5 +741,30 @@ describe("verified Stripe checkout grants", () => {
         }),
       }
     )
+  })
+})
+
+describe("server manual customer quotes", () => {
+  it("uses the same fractional-second credit total as SQL and never markup fallback", async () => {
+    const { quoteSubscriptionCost } =
+      await import("@/lib/supabase/subscription-billing")
+    const settings = {
+      version: owner,
+      markup_percent: 30,
+      credit_usd: 0.01,
+      model_markups: { unpriced: 999 },
+      fixed_credits: { test: 3 },
+      rate_units: { test: "second" },
+    }
+    stripeMocks.rpc.mockResolvedValue({ data: settings, error: null })
+    expect(
+      await quoteSubscriptionCost(owner, "test", 0.01, { duration: 1.001 })
+    ).toMatchObject({ credits: 4, usd: 0.04, unit: "second", quantity: 1.001 })
+    await expect(
+      quoteSubscriptionCost(owner, "unpriced", 0.01, {})
+    ).rejects.toThrow(/set a customer price/)
+    await expect(
+      quoteSubscriptionCost(owner, "test", 0.01, { duration: 1.00000000000001 })
+    ).rejects.toThrow(/three decimal places/)
   })
 })

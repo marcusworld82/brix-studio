@@ -134,7 +134,8 @@ export async function estimateUserGeneration(userId: string, raw: unknown) {
       const retail = await quoteSubscriptionCost(
         userId,
         input.modelId,
-        result?.usd ?? null
+        result?.usd ?? null,
+        prepared.request.body
       )
       return {
         status: "ready" as const,
@@ -195,7 +196,12 @@ export async function submitUserGeneration(userId: string, raw: unknown) {
   const providerQuote = await requestQuote(userId, input, prepared)
   const providerUsd = providerQuote?.usd ?? null
   const retail = subscription
-    ? await quoteSubscriptionCost(userId, input.modelId, providerUsd)
+    ? await quoteSubscriptionCost(
+        userId,
+        input.modelId,
+        providerUsd,
+        request.body
+      )
     : null
   const shownUsd = retail?.usd ?? providerUsd
   const usageAccepted =

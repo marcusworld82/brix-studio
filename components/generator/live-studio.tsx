@@ -1,24 +1,20 @@
 "use client"
 
-import Link from "next/link"
 import Image from "next/image"
-import { useSearchParams } from "next/navigation"
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type ReactNode,
-} from "react"
+import { useSearchParams, useRouter } from "next/navigation"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import {
   RefreshCw,
   Loader2,
   Plus,
   ImageIcon,
   Film,
-  ArrowRight,
   X,
+  SlidersHorizontal,
+  ChevronDown,
+  Search,
+  FolderClosed,
+  BookOpen,
 } from "lucide-react"
 import type {
   LiveCatalog,
@@ -37,7 +33,7 @@ import {
   uploadAsset,
   useUploads,
   uploadToLibraryItem,
-  type AssetSelection,
+  type AssetLibraryItem,
 } from "@/lib/studio/uploads"
 import {
   runToGalleryItems,
@@ -48,6 +44,29 @@ import { UserGenerations } from "@/components/studio/user-generations"
 import { VideoThumbnail } from "@/components/media/video-thumbnail"
 import { mediaPreviewUrl } from "@/lib/studio/media-preview-url"
 import { useTileActions } from "./tile-actions"
+import { HowItWorks } from "./canvas"
+import { PromptBox } from "@/components/studio/prompt-box"
+import { LiveReferencePrompt } from "./live-reference-prompt"
+import { referenceIdentity } from "./reference-identity"
+import {
+  effectiveLiveSchema,
+  liveMediaFields,
+  readLiveMediaUrls,
+  encodeLiveMediaUrls,
+  type LiveMediaField,
+  LIVE_REFERENCE_APP_LIMIT,
+  remapLiveMentionTokens,
+  validateNativeMentions,
+} from "@/generation/catalog/media-constraints"
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogBody,
+} from "@/components/ui/dialog"
 
 const fieldClass =
   "w-full min-w-0 rounded-xl border border-white/10 bg-black/25 px-3 py-2.5 text-sm text-white outline-none focus:border-lime"
@@ -55,66 +74,17 @@ type Json = Record<string, unknown>
 const record = (v: unknown): v is Json =>
   !!v && typeof v === "object" && !Array.isArray(v)
 
-export function AutomaticStudio({
-  surface,
-  children,
-}: {
-  surface: Surface
-  children: ReactNode
-}) {
-  const params = useSearchParams()
-  const [choice, setGuided] = useState<boolean | null>(null)
-  const guided =
-    choice ??
-    !!(
-      (params.get("model") && !params.get("model")?.startsWith("hf:")) ||
-      params.get("preset") ||
-      params.get("reuse") ||
-      params.get("animate") ||
-      params.get("tab")
-    )
-  return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-      <div className="flex shrink-0 items-center justify-between gap-2 px-3 py-2 text-xs">
-        <div
-          role="group"
-          aria-label="Workspace version"
-          className="flex gap-1 rounded-lg bg-white/5 p-1"
-        >
-          <button
-            onClick={() => setGuided(false)}
-            aria-pressed={!guided}
-            className={`rounded-md px-3 py-1.5 ${!guided ? "bg-white/10 text-white" : "text-white/50"}`}
-          >
-            Live models
-          </button>
-          <button
-            onClick={() => setGuided(true)}
-            aria-pressed={guided}
-            className={`rounded-md px-3 py-1.5 ${guided ? "bg-white/10 text-white" : "text-white/50"}`}
-          >
-            Guided workspace
-          </button>
-        </div>
-        <Link href="/pricing" className="text-white/60 hover:text-white">
-          Prices & deals
-        </Link>
-      </div>
-      {guided ? children : <LiveStudio surface={surface} />}
-    </div>
-  )
-}
-
 export function LiveStudio({ surface }: { surface: Surface }) {
   const { user, openAuth, pricing } = useApp()
+  const router = useRouter()
   const params = useSearchParams()
   const [catalog, setCatalog] = useState<LiveCatalog | null>(null)
   const [selected, setSelected] = useState(
-    params.get("liveModel") ??
-      (params.get("model")?.startsWith("hf:") ? params.get("model")! : "")
+    params.get("liveModel") ?? params.get("model") ?? ""
   )
   const [definition, setDefinition] = useState<LiveModelDefinition | null>(null)
   const lastModel = useRef("")
+  const previousDefinition = useRef<LiveModelDefinition | null>(null)
   const [formRevision, setFormRevision] = useState(0)
   const [values, setValues] = useState<Json>({})
   const [invalid, setInvalid] = useState<Record<string, string>>({})
@@ -122,6 +92,20 @@ export function LiveStudio({ surface }: { surface: Surface }) {
   const [error, setError] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [acceptedUsageFor, setAcceptedUsageFor] = useState("")
+  const [modelPickerOpen, setModelPickerOpen] = useState(false)
+  const [canvasChoice, setCanvasChoice] = useState<"history" | "how" | null>(
+    null
+  )
+  const dockRef = useRef<HTMLDivElement>(null)
+  const [dockHeight, setDockHeight] = useState(180)
+  useEffect(() => {
+    if (!dockRef.current) return
+    const observer = new ResizeObserver(([entry]) =>
+      setDockHeight(entry.target.getBoundingClientRect().height)
+    )
+    observer.observe(dockRef.current)
+    return () => observer.disconnect()
+  }, [])
   const runs = useRuns({ surface, enabled: !!user })
   const uploadState = useUploads()
   const loadUploads = uploadState.load
@@ -182,9 +166,34 @@ export function LiveStudio({ surface }: { surface: Surface }) {
         if (!response.ok || !data.model)
           throw new Error(data.error || "Could not load model inputs.")
         if (active) {
+          const prior = previousDefinition.current
+          previousDefinition.current = data.model
           setDefinition(data.model)
           if (lastModel.current !== selected) {
-            setValues(data.model.defaults ?? {})
+            setValues((old) => {
+              let prompt = typeof old.prompt === "string" ? old.prompt : ""
+              if (prior && prior.id !== data.model.id)
+                for (const field of liveMediaFields(prior, old)) {
+                  prompt = remapLiveMentionTokens(
+                    prompt,
+                    field,
+                    readLiveMediaUrls(field, old[field.key]),
+                    []
+                  )
+                  if (field.mentionSyntax)
+                    prompt = prompt.replace(
+                      new RegExp(`${field.mentionSyntax.prefix}\\d+\\b`, "g"),
+                      ""
+                    )
+                }
+              return {
+                ...(data.model.defaults ?? {}),
+                ...(record(data.model.inputSchema?.properties) &&
+                "prompt" in data.model.inputSchema.properties
+                  ? { prompt }
+                  : {}),
+              }
+            })
             setInvalid({})
             lastModel.current = selected
           }
@@ -203,6 +212,35 @@ export function LiveStudio({ surface }: { surface: Surface }) {
     }
   }, [selected, catalog?.fetchedAt])
   const current = definition?.id === selected ? definition : null
+  const effectiveSchema = current ? effectiveLiveSchema(current, values) : {}
+  const mediaFields = current ? liveMediaFields(current, values) : []
+  const totalReferences = mediaFields.reduce(
+    (count, field) =>
+      count + readLiveMediaUrls(field, values[field.key]).length,
+    0
+  )
+  const mediaProblems = mediaFields.flatMap((field) => {
+    const count = readLiveMediaUrls(field, values[field.key]).length
+    return count < field.minItems &&
+      (field.required || values[field.key] !== undefined)
+      ? [
+          `${field.name} requires at least ${field.minItems} ${field.kind} files.`,
+        ]
+      : field.maxItems !== null && count > field.maxItems
+        ? [
+            `${field.name} allows at most ${field.maxItems} ${field.kind} files.`,
+          ]
+        : []
+  })
+  if (totalReferences > LIVE_REFERENCE_APP_LIMIT)
+    mediaProblems.push("The studio allows at most 60 references in total.")
+  if (current) mediaProblems.push(...validateNativeMentions(current, values))
+  const properties = record(effectiveSchema.properties)
+    ? effectiveSchema.properties
+    : {}
+  const required = Array.isArray(effectiveSchema.required)
+    ? (effectiveSchema.required as string[])
+    : []
   const input = current
     ? {
         modelId: current.id,
@@ -219,7 +257,11 @@ export function LiveStudio({ surface }: { surface: Surface }) {
       : user?.apiKeyConnected)
   const price = useApiPrice(
     input,
-    !!connected && !!current && !current.stale && !Object.keys(invalid).length,
+    !!connected &&
+      !!current &&
+      !current.stale &&
+      !Object.keys(invalid).length &&
+      !mediaProblems.length,
     user?.apiConnectionVersion
   )
   const usageKey = JSON.stringify({
@@ -236,14 +278,10 @@ export function LiveStudio({ surface }: { surface: Surface }) {
     (price.status === "ready" && price.usd !== null) || usageAccepted
   const models = (catalog?.models ?? []).filter((m) => m.surface === surface)
   const visible = models.filter((m) =>
-    `${m.label} ${m.family}`.toLowerCase().includes(search.toLowerCase())
+    `${m.label} ${m.family} ${m.id.startsWith("or:") ? "OpenRouter" : "Higgsfield"}`
+      .toLowerCase()
+      .includes(search.toLowerCase())
   )
-  const properties = record(current?.inputSchema.properties)
-    ? current.inputSchema.properties
-    : {}
-  const required = Array.isArray(current?.inputSchema.required)
-    ? (current.inputSchema.required as string[])
-    : []
   const ordered = Object.entries(properties).sort(([a], [b]) =>
     a === "prompt" ? -1 : b === "prompt" ? 1 : 0
   )
@@ -251,9 +289,19 @@ export function LiveStudio({ surface }: { surface: Surface }) {
     ...uploadState.uploads.map(uploadToLibraryItem),
     ...runs.records.flatMap(runToLibraryItems),
   ]
-  const patch = (key: string, value: unknown) =>
+  const patch = (key: string, value: unknown, promptOverride?: string) =>
     setValues((old) => {
       const next = { ...old }
+      const field = mediaFields.find((candidate) => candidate.key === key)
+      if (field && typeof old.prompt === "string")
+        next.prompt =
+          promptOverride ??
+          remapLiveMentionTokens(
+            old.prompt,
+            field,
+            readLiveMediaUrls(field, old[key]),
+            readLiveMediaUrls(field, value)
+          )
       if (value === undefined) delete next[key]
       else next[key] = value
       return next
@@ -266,8 +314,11 @@ export function LiveStudio({ surface }: { surface: Surface }) {
       return next
     })
   const reuse = useCallback((run: GenerationView) => {
-    if (!run.modelId.startsWith("hf:")) {
-      setError("Open the guided workspace to reuse this guided generation.")
+    if (!run.modelId.startsWith("hf:") && !run.modelId.startsWith("or:")) {
+      setValues((old) => ({ ...old, prompt: run.prompt }))
+      setError(
+        "Prompt reused. Choose a current API model and review its settings before generating."
+      )
       return
     }
     const saved = { ...run.settings }
@@ -293,7 +344,13 @@ export function LiveStudio({ surface }: { surface: Surface }) {
       return
     }
     if (!connected) return
-    if (!current || !quoteReady || submitting || Object.keys(invalid).length)
+    if (
+      !current ||
+      !quoteReady ||
+      submitting ||
+      Object.keys(invalid).length ||
+      mediaProblems.length
+    )
       return
     setSubmitting(true)
     setError("")
@@ -322,256 +379,326 @@ export function LiveStudio({ surface }: { surface: Surface }) {
         : price.status === "variable" && price.allowUsagePrice
           ? "Usage pricing"
           : "Price pending"
+  const canvasView = canvasChoice ?? (items.length ? "history" : "how")
+  const renderField = ([key, raw]: [string, unknown]) =>
+    record(raw) ? (
+      <LiveField
+        key={`${current?.id}:${formRevision}:${key}`}
+        name={key}
+        schema={raw}
+        required={required.includes(key)}
+        value={values[key]}
+        onChange={(value) => {
+          const field = mediaFields.find((candidate) => candidate.key === key)
+          patch(
+            key,
+            field && !field.required && !readLiveMediaUrls(field, value).length
+              ? undefined
+              : value
+          )
+        }}
+        onError={(message) => fieldError(key, message)}
+        library={library}
+        signedIn={!!user}
+        mediaField={mediaFields.find((field) => field.key === key)}
+        totalReferences={totalReferences}
+      />
+    ) : null
+  const settings = ordered.filter(([key]) => key !== "prompt")
   return (
-    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3 overflow-y-auto px-2 pb-2 md:flex-row md:overflow-hidden md:px-4">
+    <div className="relative flex min-h-0 min-w-0 flex-1 flex-col p-2 md:p-4 md:pt-2">
       <section
-        className="studio-backdrop flex w-full min-w-0 shrink-0 flex-col overflow-hidden rounded-2xl border border-white/10 md:w-[360px] md:shrink-0"
-        aria-label="Live model generation settings"
+        className="studio-backdrop relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[20px] border border-white/10"
+        aria-label="Results"
       >
-        <div className="flex items-start justify-between gap-3 border-b border-white/10 p-4">
-          <div>
-            <h1 className="font-display text-xl">
-              {surface === "image" ? "Image studio" : "Video studio"}
-            </h1>
-            <p className="mt-1 text-xs text-white/50">
-              {models.length} current API modes · updates automatically
-            </p>
+        <div className="flex min-h-12 shrink-0 items-center justify-between gap-2 px-3">
+          <div
+            role="tablist"
+            aria-label="Canvas view"
+            className="flex items-center gap-1"
+          >
+            {(
+              [
+                ["history", "History", FolderClosed],
+                ["how", "How it works", BookOpen],
+              ] as const
+            ).map(([view, label, Icon]) => (
+              <button
+                type="button"
+                key={view}
+                role="tab"
+                aria-selected={canvasView === view}
+                onClick={() => setCanvasChoice(view)}
+                className={`flex min-h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs ${canvasView === view ? "bg-white/[0.08] text-white" : "text-white/50"}`}
+              >
+                <Icon className="size-3.5" />
+                {label}
+              </button>
+            ))}
           </div>
           <button
+            type="button"
             onClick={() => void load()}
-            className="rounded-lg p-2 hover:bg-white/10"
-            aria-label="Refresh live catalog"
+            className="flex min-h-9 items-center gap-1.5 rounded-lg px-2 text-xs text-white/50 hover:text-white"
+            aria-label="Refresh model catalog"
           >
-            <RefreshCw className="size-4" />
+            <RefreshCw className="size-3.5" />
+            <span className="hidden sm:inline">{models.length} models</span>
           </button>
         </div>
-        <div className="flex min-w-0 flex-col gap-4 overflow-y-auto p-4 md:min-h-0 md:flex-1">
-          <input
-            className={fieldClass}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Find a model"
-            aria-label="Find a model"
-          />
-          <label className="flex min-w-0 flex-col gap-1.5 text-xs text-white/70">
-            Model
-            <select
-              className={fieldClass}
-              value={selected}
-              onChange={(e) => {
-                setSelected(e.target.value)
-                setError("")
+        <div
+          className="flex min-h-0 flex-1 flex-col overflow-y-auto"
+          style={{ paddingBottom: dockHeight + 16 }}
+        >
+          {canvasView === "how" ? (
+            <HowItWorks surface={surface} tab="create" />
+          ) : (
+            <div className="flex min-h-0 flex-1 flex-col px-3">
+              <UserGenerations
+                items={items}
+                title={<span className="text-sm">Your generations</span>}
+                actions={(item) =>
+                  actions(item).filter((action) => action.id !== "template")
+                }
+                hasMore={runs.hasMore}
+                loadingMore={runs.loadingMore}
+                onLoadMore={runs.loadMore}
+                emptyState={<HowItWorks surface={surface} tab="create" />}
+              />
+            </div>
+          )}
+        </div>
+      </section>
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center px-3 pb-3 md:px-6 md:pb-6">
+        <div
+          ref={dockRef}
+          className="pointer-events-auto w-full max-w-[1120px]"
+        >
+          {(error ||
+            runs.error ||
+            review ||
+            current?.stale ||
+            catalog?.stale) && (
+            <div
+              className="mx-3 mb-2 max-h-24 overflow-y-auto rounded-xl border border-white/10 bg-page px-3 py-2 text-xs text-amber-200"
+              role="status"
+            >
+              {error ||
+                runs.error ||
+                (review
+                  ? "An earlier request needs provider review. Check its usage before retrying."
+                  : current?.stale
+                    ? "Refresh the model schema before generating."
+                    : "Showing saved catalog data while the provider refreshes.")}
+            </div>
+          )}
+          <PromptBox.Root
+            surface="glass"
+            className="w-full"
+            aria-label={`${surface === "image" ? "Image" : "Video"} generation controls`}
+          >
+            <PromptBox.Body>
+              {current ? (
+                <LiveReferencePrompt
+                  key={current.id}
+                  fields={mediaFields}
+                  values={values}
+                  prompt={
+                    typeof values.prompt === "string" ? values.prompt : ""
+                  }
+                  onPromptChange={(value) => patch("prompt", value)}
+                  onFieldChange={patch}
+                  library={library}
+                  signedIn={!!user}
+                  onSignIn={() => openAuth({ mode: "signup" })}
+                  maxLength={
+                    record(properties.prompt) &&
+                    typeof properties.prompt.maxLength === "number"
+                      ? properties.prompt.maxLength
+                      : undefined
+                  }
+                  onGenerate={() => void generate()}
+                />
+              ) : (
+                <p className="flex items-center gap-2 p-3 text-sm text-white/50">
+                  <Loader2 className="size-4 animate-spin" />
+                  Loading model inputs…
+                </p>
+              )}
+              <PromptBox.Actions className="flex-wrap">
+                <Dialog
+                  open={modelPickerOpen}
+                  onOpenChange={setModelPickerOpen}
+                >
+                  <DialogTrigger
+                    render={
+                      <PromptBox.Pill
+                        aria-label={`Model: ${current?.label ?? "Choose a model"}`}
+                        start={surface === "image" ? <ImageIcon /> : <Film />}
+                        end={<ChevronDown />}
+                        className="max-w-[min(270px,65vw)]"
+                      >
+                        <span className="truncate">
+                          {current?.label ?? "Choose a model"}
+                        </span>
+                      </PromptBox.Pill>
+                    }
+                  />
+                  <DialogContent size="xl">
+                    <DialogHeader>
+                      <DialogTitle>
+                        Choose {surface === "image" ? "an image" : "a video"}{" "}
+                        model
+                      </DialogTitle>
+                      <DialogDescription>
+                        All currently discovered compatible API modes. Settings
+                        follow the selected model.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <label className="flex items-center gap-2 rounded-xl border border-white/10 px-3">
+                      <Search className="size-4 text-white/50" />
+                      <input
+                        className="min-h-11 w-full min-w-0 bg-transparent text-sm outline-none"
+                        aria-label="Find a model"
+                        placeholder="Search name, family or provider"
+                        value={search}
+                        onChange={(event) => setSearch(event.target.value)}
+                      />
+                    </label>
+                    <DialogBody>
+                      <div className="grid max-h-[55dvh] gap-2 overflow-y-auto sm:grid-cols-2">
+                        {visible.map((model) => (
+                          <button
+                            key={model.id}
+                            type="button"
+                            aria-pressed={selected === model.id}
+                            onClick={() => {
+                              setSelected(model.id)
+                              setError("")
+                              setSearch("")
+                              setModelPickerOpen(false)
+                            }}
+                            className={`min-w-0 rounded-xl border p-3 text-left ${selected === model.id ? "border-lime bg-lime/10" : "border-white/10 bg-white/[.03] hover:bg-white/[.07]"}`}
+                          >
+                            <span className="block text-sm font-medium">
+                              {model.label}
+                            </span>
+                            <span className="mt-1 block text-xs text-white/50">
+                              {model.id.startsWith("or:")
+                                ? "OpenRouter"
+                                : "Higgsfield"}{" "}
+                              · {model.family}
+                            </span>
+                          </button>
+                        ))}
+                        {!visible.length && (
+                          <p className="p-4 text-sm text-white/50">
+                            No models match this search.
+                          </p>
+                        )}
+                      </div>
+                    </DialogBody>
+                  </DialogContent>
+                </Dialog>
+                <Dialog>
+                  <DialogTrigger
+                    render={
+                      <PromptBox.Pill
+                        start={<SlidersHorizontal />}
+                        aria-label="Model settings"
+                        disabled={!current}
+                      >
+                        Settings
+                      </PromptBox.Pill>
+                    }
+                  />
+                  <DialogContent size="md">
+                    <DialogHeader>
+                      <DialogTitle>{current?.label} settings</DialogTitle>
+                      <DialogDescription>
+                        Inputs and limits come from this model&apos;s current
+                        schema.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <DialogBody>
+                      <div className="grid max-h-[60dvh] gap-5 overflow-y-auto pr-1">
+                        {settings.map(renderField)}
+                        {!settings.length && (
+                          <p className="text-sm text-white/50">
+                            This model has no additional settings.
+                          </p>
+                        )}
+                      </div>
+                    </DialogBody>
+                  </DialogContent>
+                </Dialog>
+                <span className="ml-auto hidden text-[11px] text-white/40 sm:inline">
+                  {catalog
+                    ? `${models.length} models · ${catalog.stale ? "saved catalog" : "catalog updated"}`
+                    : "Loading catalog"}
+                </span>
+              </PromptBox.Actions>
+            </PromptBox.Body>
+            <PromptBox.Generate
+              cost={user && connected ? priceLabel : undefined}
+              disabled={
+                !!user &&
+                connected &&
+                (!quoteReady ||
+                  submitting ||
+                  !current ||
+                  current.stale ||
+                  !!Object.keys(invalid).length ||
+                  !!mediaProblems.length ||
+                  !!review)
+              }
+              onClick={() => {
+                if (!user) openAuth({ mode: "signup" })
+                else if (!connected) router.push("/account")
+                else void generate()
               }}
             >
-              {!visible.some((m) => m.id === selected) &&
-              models.find((m) => m.id === selected) ? (
-                <option value={selected}>
-                  {models.find((m) => m.id === selected)?.label}
-                </option>
-              ) : null}
-              {visible.map((m) => (
-                <option key={m.id} value={m.id}>
-                  {m.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          {catalog?.stale ? (
-            <p role="status" className="text-xs text-amber-300">
-              Showing saved catalog data. Waiting for the provider to refresh.
-            </p>
-          ) : (
-            <p className="text-xs text-white/40">
-              Catalog checked{" "}
-              {catalog
-                ? new Date(catalog.fetchedAt).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })
-                : "…"}
-            </p>
-          )}
-          {current ? (
-            <>
-              <p className="text-xs leading-relaxed text-white/60">
-                {current.description}
-              </p>
-              {ordered.map(([key, raw]) =>
-                record(raw) ? (
-                  <LiveField
-                    key={`${current.id}:${formRevision}:${key}`}
-                    name={
-                      key === "input_references" && current.id.startsWith("or:")
-                        ? "image_urls"
-                        : key
-                    }
-                    schema={
-                      key === "input_references" && current.id.startsWith("or:")
-                        ? { ...raw, title: "Reference images" }
-                        : raw
-                    }
-                    required={required.includes(key)}
-                    value={
-                      key === "input_references" && Array.isArray(values[key])
-                        ? (values[key] as { image_url: { url: string } }[]).map(
-                            (v) => v.image_url.url
-                          )
-                        : values[key]
-                    }
-                    onChange={(v) =>
-                      patch(
-                        key,
-                        key === "input_references" && Array.isArray(v)
-                          ? v.map((url) => ({
-                              type: "image_url",
-                              image_url: { url },
-                            }))
-                          : v
-                      )
-                    }
-                    onError={(message) => fieldError(key, message)}
-                    library={library}
-                    signedIn={!!user}
-                  />
-                ) : null
-              )}
-              {current.stale ? (
-                <p className="text-xs text-amber-300">
-                  A current input schema is needed before generating.
-                </p>
-              ) : null}
-            </>
-          ) : (
-            <p className="flex items-center gap-2 text-sm text-white/50">
-              <Loader2 className="size-4 animate-spin" /> Loading model inputs…
-            </p>
-          )}
-          {review ? (
-            <p
-              role="alert"
-              className="rounded-xl border border-amber-300/20 p-3 text-xs text-amber-100"
-            >
-              An earlier request needs provider review. Check its usage before
-              submitting this model again.
-            </p>
-          ) : null}
-          {error || runs.error ? (
-            <p
-              role="alert"
-              className="rounded-xl border border-red-400/25 bg-red-400/5 p-3 text-xs text-red-200"
-            >
-              {error || runs.error}
-            </p>
-          ) : null}
-          {price.status === "variable" && price.allowUsagePrice ? (
-            <label className="flex items-start gap-3 rounded-xl border border-white/15 p-3 text-xs leading-relaxed text-white/75">
+              {!user
+                ? "Sign in"
+                : !connected
+                  ? "Connect key"
+                  : submitting
+                    ? "Submitting…"
+                    : "Generate"}
+            </PromptBox.Generate>
+          </PromptBox.Root>
+          {price.status === "variable" && price.allowUsagePrice && (
+            <label className="mx-3 flex items-start gap-2 rounded-lg bg-page px-3 py-2 text-xs text-white/70">
               <input
-                className="mt-0.5 size-4 shrink-0 accent-lime"
                 type="checkbox"
+                className="mt-0.5 accent-lime"
                 checked={usageAccepted}
-                onChange={(e) =>
-                  setAcceptedUsageFor(e.target.checked ? usageKey : "")
+                onChange={(event) =>
+                  setAcceptedUsageFor(event.target.checked ? usageKey : "")
                 }
               />
               I accept usage-based billing from my OpenRouter account. The exact
               total is reported after generation.
             </label>
-          ) : null}
-          {price.error ? (
-            <p role="status" className="text-xs text-amber-200">
-              {price.error}
-            </p>
-          ) : null}
-        </div>
-        <div className="sticky bottom-0 z-10 flex shrink-0 flex-col gap-2 border-t border-white/10 bg-page p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-          {!user ? (
-            <button
-              className="btn-keycap h-12 rounded-xl text-sm font-semibold"
-              onClick={() => openAuth({ mode: "signup" })}
-            >
-              Create your account <ArrowRight className="ml-2 inline size-4" />
-            </button>
-          ) : !connected ? (
-            <Link
-              className="btn-keycap flex h-12 items-center justify-center rounded-xl text-sm font-semibold"
-              href="/account"
-            >
-              Connect your{" "}
-              {selected.startsWith("or:") ? "OpenRouter" : "Higgsfield"} API key
-            </Link>
-          ) : (
-            <button
-              className="btn-keycap btn-keycap-generate flex min-h-12 items-center justify-center gap-3 rounded-xl px-3 text-sm font-semibold disabled:opacity-50"
-              onClick={() => void generate()}
-              disabled={
-                !quoteReady ||
-                submitting ||
-                !current ||
-                current.stale ||
-                !!Object.keys(invalid).length ||
-                !!review
-              }
-            >
-              {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
-              Generate{" "}
-              <span aria-live="polite" className="font-mono">
-                {priceLabel}
-              </span>
-            </button>
           )}
-          {price.status === "ready" ? (
-            <p className="text-center text-[11px] leading-relaxed text-white/50">
-              {subscription && price.credits != null
-                ? "Studio price: " +
-                  price.credits.toLocaleString() +
-                  " credits. "
-                : ""}
-              {price.explanation}
-              {price.discountUsd
-                ? ` Includes ${formatUsd(price.discountUsd)} provider discount.`
-                : ""}
+          {!!mediaProblems.length && (
+            <p
+              className="mx-3 mt-1 rounded-lg bg-page px-3 py-2 text-xs text-amber-200"
+              role="status"
+            >
+              {mediaProblems.join(" ")}
             </p>
-          ) : (
-            <p className="text-center text-[11px] text-white/40">
-              A dollar price appears before you generate.
+          )}
+          {(price.error || price.explanation) && (
+            <p
+              className="mx-3 mt-1 text-center text-[11px] text-white/50"
+              role="status"
+            >
+              {price.error || price.explanation}
             </p>
           )}
         </div>
-      </section>
-      <section
-        className="studio-backdrop flex min-h-[420px] min-w-0 flex-1 flex-col rounded-2xl border border-white/10 p-3 md:min-h-0"
-        aria-label="Your generations"
-      >
-        <UserGenerations
-          items={items}
-          title={<span className="text-sm">Your generations</span>}
-          actions={(item) =>
-            actions(item).filter((action) => action.id !== "template")
-          }
-          hasMore={runs.hasMore}
-          loadingMore={runs.loadingMore}
-          onLoadMore={runs.loadMore}
-          emptyState={
-            <div className="flex min-h-80 flex-col items-center justify-center gap-4 px-5 text-center">
-              <div className="flex size-16 items-center justify-center rounded-2xl bg-white/5">
-                {surface === "image" ? (
-                  <ImageIcon className="size-7 text-[#0582ca]" />
-                ) : (
-                  <Film className="size-7 text-[#0582ca]" />
-                )}
-              </div>
-              <h2 className="font-display text-3xl">Make something yours.</h2>
-              <p className="max-w-sm text-sm leading-relaxed text-white/50">
-                Choose a model, add your inputs and review the price. Completed
-                work stays in your private library.
-              </p>
-              <Link href="/pricing" className="text-sm text-[#38a6e8]">
-                Explore model prices
-              </Link>
-            </div>
-          }
-        />
-      </section>
+      </div>
       {dialogs}
     </div>
   )
@@ -586,6 +713,8 @@ function LiveField({
   onError,
   library,
   signedIn,
+  mediaField,
+  totalReferences,
 }: {
   name: string
   schema: Json
@@ -593,39 +722,34 @@ function LiveField({
   value: unknown
   onChange: (value: unknown) => void
   onError: (message: string) => void
-  library: AssetSelection[]
+  library: AssetLibraryItem[]
   signedIn: boolean
+  mediaField?: LiveMediaField
+  totalReferences: number
 }) {
   const label =
     typeof schema.title === "string" ? schema.title : name.replaceAll("_", " ")
   const type = Array.isArray(schema.type)
     ? schema.type.find((t) => t !== "null")
     : schema.type
-  const isArray = type === "array"
-  const mediaKind = /video/i.test(name)
-    ? "video"
-    : /audio/i.test(name)
-      ? "audio"
-      : /image|photo|frame/i.test(name)
-        ? "image"
-        : null
-  const media =
-    mediaKind &&
-    (/urls?$/i.test(name) ||
-      schema.format === "uri" ||
-      (isArray && record(schema.items) && schema.items.format === "uri")) &&
-    (type === "string" || isArray)
+  const isArray = mediaField?.array ?? type === "array"
+  const mediaKind = mediaField?.kind
+  const media = !!mediaField
   const [uploading, setUploading] = useState(false)
   const [localError, setLocalError] = useState("")
-  const urls = media
-    ? isArray
-      ? Array.isArray(value)
-        ? value.filter((v): v is string => typeof v === "string")
-        : []
-      : typeof value === "string"
-        ? [value]
-        : []
-    : []
+  const urls = mediaField ? readLiveMediaUrls(mediaField, value) : []
+  const effectiveMax = mediaField
+    ? Math.max(
+        0,
+        Math.min(
+          mediaField.maxItems ?? LIVE_REFERENCE_APP_LIMIT,
+          LIVE_REFERENCE_APP_LIMIT - (totalReferences - urls.length)
+        )
+      )
+    : 0
+  const remaining = isArray
+    ? Math.max(0, effectiveMax - urls.length)
+    : effectiveMax
   if (media) {
     const selections = urls.map((src, index) => ({
       id: src,
@@ -637,8 +761,15 @@ function LiveField({
       <div className="flex min-w-0 flex-col gap-2">
         <span className="text-xs text-white/70">
           {label}
-          {required ? " *" : ""}
+          {required || mediaField?.required ? " *" : ""} · {urls.length}/
+          {mediaField?.maxItems ?? "provider max unspecified"}
         </span>
+        {mediaField?.maxItems === null && (
+          <p className="text-[11px] text-white/40">
+            Provider maximum not published. Studio safety limit: 60 total
+            references.
+          </p>
+        )}
         <div className="flex flex-wrap gap-2">
           {selections.map((item) => (
             <span
@@ -666,7 +797,10 @@ function LiveField({
                 aria-label={`Remove ${item.name}`}
                 onClick={() =>
                   onChange(
-                    isArray ? urls.filter((src) => src !== item.src) : undefined
+                    encodeLiveMediaUrls(
+                      mediaField!,
+                      urls.filter((src) => src !== item.src)
+                    )
                   )
                 }
               >
@@ -677,17 +811,10 @@ function LiveField({
         </div>
         {signedIn ? (
           <AssetLibraryModal
-            items={library.map((item) => ({
-              ...item,
-              source: "upload" as const,
-              createdAt: 0,
-            }))}
+            items={library}
             accept={[mediaKind!]}
-            maxSelections={
-              isArray
-                ? Math.max(1, Number(schema.maxItems ?? 10) - urls.length)
-                : 1
-            }
+            maxSelections={Math.max(1, remaining)}
+            excludeIds={isArray ? urls : []}
             onUpload={async (file) => {
               setUploading(true)
               setLocalError("")
@@ -703,18 +830,28 @@ function LiveField({
               }
             }}
             onSelectMany={(picked) => {
-              onChange(
-                isArray
-                  ? [...urls, ...picked.map((p) => p.src)]
-                  : picked[0]?.src
-              )
+              const selected = isArray
+                ? [
+                    ...urls,
+                    ...picked
+                      .filter((item) => item.kind === mediaKind)
+                      .map((item) => item.src),
+                  ]
+                    .filter(
+                      (url, index, all) =>
+                        all.findIndex(
+                          (candidate) =>
+                            referenceIdentity(candidate) ===
+                            referenceIdentity(url)
+                        ) === index
+                    )
+                    .slice(0, effectiveMax)
+                : picked.slice(0, 1).map((item) => item.src)
+              onChange(encodeLiveMediaUrls(mediaField!, selected))
             }}
             trigger={
               <button
-                disabled={
-                  uploading ||
-                  (isArray && urls.length >= Number(schema.maxItems ?? 10))
-                }
+                disabled={uploading || !remaining}
                 className={`${fieldClass} flex items-center justify-center gap-2`}
               >
                 {uploading ? (

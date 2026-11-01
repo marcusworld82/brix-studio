@@ -1,6 +1,10 @@
 import "server-only"
 import { getProviderModel } from "@/lib/providers/catalog"
 import { validateLiveInput } from "@/generation/catalog/live-schema"
+import {
+  effectiveLiveSchema,
+  validateNativeMentions,
+} from "@/generation/catalog/media-constraints"
 import { groupMedia } from "@/generation/catalog/media-inputs"
 import type { MediaItem, MediaRole } from "@/generation/catalog/types"
 import { UserFacingError } from "@/lib/errors"
@@ -22,6 +26,31 @@ export async function prepareLiveUserGeneration(
   const parsed = validateLiveInput(definition, input.settings.providerInput)
   if (!parsed.data)
     throw new UserFacingError(parsed.errors.join(" ").slice(0, 1500))
+  // Additional properties can be valid API extensions, but undeclared quantity
+  // aliases must never turn into trusted billing inputs for a source-length job.
+  const properties = effectiveLiveSchema(definition, parsed.data).properties
+  for (const field of [
+    "duration",
+    "duration_seconds",
+    "seconds",
+    "n",
+    "num_images",
+    "num_outputs",
+    "batch_size",
+  ]) {
+    if (
+      Object.hasOwn(parsed.data, field) &&
+      (!properties ||
+        typeof properties !== "object" ||
+        !Object.hasOwn(properties, field))
+    )
+      throw new UserFacingError(
+        `This model does not define the ${field} setting. Remove it and review the model inputs.`
+      )
+  }
+  const mentionErrors = validateNativeMentions(definition, parsed.data)
+  if (mentionErrors.length)
+    throw new UserFacingError(mentionErrors.join(" ").slice(0, 1500))
   const media: (MediaItem & { path: string })[] = []
   const service = createSupabaseServiceClient()
   async function resolve(

@@ -133,6 +133,15 @@ function thumbnail(row: Row): string | undefined {
     )
   )
 }
+/** These public model schemas and model docs explicitly identify the renderer.
+ * https://open.higgsfield.ai/models/marketing-studio/image/flare/api-reference
+ * https://open.higgsfield.ai/models/marketing-studio/image/sunburst/api-reference
+ * API paths and the Higgsfield provider remain unchanged.
+ */
+const rendererLabels: Record<string, string> = {
+  "marketing-studio/image/flare": "GPT Image 2.5 Flare",
+  "marketing-studio/image/sunburst": "GPT Image 2.5 Sunburst",
+}
 function summary(
   row: Row,
   family: Row,
@@ -143,12 +152,15 @@ function summary(
     id: `hf:${path}`,
     path,
     label:
+      rendererLabels[path] ||
       text(row.display_title) ||
       [text(row.title) || text(family.title), text(row.variant_title)]
         .filter(Boolean)
         .join(" · ") ||
       path,
-    family: text(family.title) || text(family.model_slug) || text(family.slug),
+    family: rendererLabels[path]
+      ? "GPT Image 2.5"
+      : text(family.title) || text(family.model_slug) || text(family.slug),
     surface: output,
     description: text(
       row.description ||

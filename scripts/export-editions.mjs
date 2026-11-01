@@ -61,6 +61,7 @@ const docs = new Set([
   "docs/personal-edition-setup.md",
   "docs/editions-handover.md",
   "docs/subscription-integration.md",
+  "docs/unified-studio.md",
 ])
 const examples = [
   "editions/personal.env.example",

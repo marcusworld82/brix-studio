@@ -1,7 +1,7 @@
 import type { Metadata } from "next"
 import { Suspense } from "react"
 
-import { AutomaticStudio } from "@/components/generator/live-studio"
+import { LiveStudio } from "@/components/generator/live-studio"
 import { isSupabaseBackend } from "@/lib/backend"
 import { GeneratorView } from "@/components/generator/generator-view"
 import { listPresets, type PresetView } from "@/lib/presets"
@@ -24,9 +24,7 @@ export default async function ImagePage() {
   return (
     <Suspense>
       {isSupabaseBackend() ? (
-        <AutomaticStudio surface="image">
-          <GeneratorView surface="image" presets={await presets()} />
-        </AutomaticStudio>
+        <LiveStudio surface="image" />
       ) : (
         <GeneratorView surface="image" presets={await presets()} />
       )}

@@ -58,7 +58,15 @@ export function HowItWorks({
   tab: GeneratorTab
 }) {
   const [title, subtitle] = HEADLINE[surface][tab]
-  const steps = STEPS[surface]
+  const steps = STEPS[surface].map((step, index) =>
+    surface === "video" && index === 1
+      ? {
+          ...step,
+          title: "Choose a model",
+          body: "Pick a model, then review its available settings and reference inputs.",
+        }
+      : step
+  )
   const centered = tab !== "create"
   return (
     <div
@@ -169,7 +177,7 @@ export function Canvas({
     <section
       aria-label="Results"
       className={cn(
-        "studio-backdrop relative flex min-h-[60vh] min-w-0 shrink-0 flex-1 flex-col overflow-hidden rounded-[20px] border border-white/10 md:min-h-0 md:shrink",
+        "studio-backdrop relative flex min-h-[60vh] min-w-0 flex-1 shrink-0 flex-col overflow-hidden rounded-[20px] border border-white/10 md:min-h-0 md:shrink",
         className
       )}
     >

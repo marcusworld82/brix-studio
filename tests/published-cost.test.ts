@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest"
-import { publishedCost } from "@/lib/higgsfield/published-cost"
+import {
+  publishedCost,
+  publishedFormulaSupported,
+} from "@/lib/higgsfield/published-cost"
 const pricing = {
   primary: {
     amount: "0.3405",
@@ -18,6 +21,116 @@ const pricing = {
   ],
 }
 describe("Published formula estimates", () => {
+  const lightDescription =
+    "Priced per total second by resolution: 480p $0.05, 720p $0.10, or 1080p $0.20. Rates shown are before any applicable customer discount. Billable seconds = output duration + the sum of input reference video durations. Input video durations are measured during preprocessing; without video references, only output duration is billed. Genjutsu Light trims the source to 15 seconds; output duration is rounded up to whole seconds before billing."
+  const lightPricing = {
+    primary: {
+      amount: "0.025",
+      original_amount: "0.05",
+      currency: "USD",
+      unit: "second",
+    },
+    options: [
+      {
+        amount: "0.025",
+        original_amount: "0.05",
+        currency: "USD",
+        unit: "second",
+        configuration: { resolution: "480p" },
+      },
+      {
+        amount: "0.05",
+        original_amount: "0.1",
+        currency: "USD",
+        unit: "second",
+        configuration: { resolution: "720p" },
+      },
+      {
+        amount: "0.1",
+        original_amount: "0.2",
+        currency: "USD",
+        unit: "second",
+        configuration: { resolution: "1080p" },
+      },
+    ],
+  }
+  it.each(["motion-transfer", "object-swap"])(
+    "supports verified Light %s pricing at every resolution",
+    (operation) => {
+      const path = `higgsfield/genjutsu-light/${operation}/v1.0`
+      expect(publishedFormulaSupported(path)).toBe(true)
+      for (const [resolution, expected] of [
+        ["480p", 0.25],
+        ["720p", 0.5],
+        ["1080p", 1],
+      ] as const) {
+        expect(
+          publishedCost(
+            path,
+            { resolution, duration: 1 },
+            lightPricing,
+            lightDescription,
+            [{ kind: "video", role: "source", durationSec: 4.1 }]
+          )
+        ).toMatchObject({ usd: expected, estimated: true })
+      }
+    }
+  )
+  it("caps Light at the documented 15 second trimmed source", () => {
+    expect(
+      publishedCost(
+        "higgsfield/genjutsu-light/motion-transfer/v1.0",
+        { resolution: "720p" },
+        lightPricing,
+        lightDescription,
+        [{ kind: "video", role: "source", durationSec: 35.2 }]
+      )
+    ).toMatchObject({ usd: 1.5 })
+  })
+  it("fails closed for unknown Light billing, reference videos, missing source metadata or rates", () => {
+    const path = "higgsfield/genjutsu-light/motion-transfer/v1.0"
+    const source = { kind: "video", role: "source", durationSec: 4.1 }
+    expect(
+      publishedCost(
+        path,
+        { resolution: "720p", duration: 1 },
+        lightPricing,
+        lightDescription,
+        []
+      )
+    ).toBeNull()
+    expect(
+      publishedCost(
+        path,
+        { resolution: "720p" },
+        lightPricing,
+        lightDescription,
+        [source, { kind: "video", role: "reference", durationSec: 2 }]
+      )
+    ).toBeNull()
+    expect(
+      publishedCost(path, { resolution: "720p" }, lightPricing, "unknown", [
+        source,
+      ])
+    ).toBeNull()
+    expect(
+      publishedCost(
+        path,
+        { resolution: "4k" },
+        lightPricing,
+        lightDescription,
+        [source]
+      )
+    ).toBeNull()
+    expect(
+      publishedCost(path, { resolution: "720p" }, null, lightDescription, [
+        source,
+      ])
+    ).toBeNull()
+    expect(publishedFormulaSupported("higgsfield/genjutsu-light/new/v2")).toBe(
+      false
+    )
+  })
   it("uses list rate and rounded real source duration, not an unverified maximum discount", () => {
     expect(
       publishedCost(

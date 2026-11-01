@@ -1,4 +1,8 @@
 import "server-only"
+import {
+  subscriptionRateQuantity,
+  subscriptionRateCredits,
+} from "@/lib/billing/subscription-rate"
 import type { SupabaseClient } from "@supabase/supabase-js"
 import type Stripe from "stripe"
 import { z } from "zod"
@@ -59,12 +63,19 @@ export async function subscriptionBalance(userId: string) {
   }
 }
 export const pricingSettingsSchema = z.object({
+  expectedVersion: z.uuid().optional(),
   markupPercent: z.number().finite().min(0).max(10000),
   creditUsd: z.number().finite().positive().max(100),
   fixedCredits: z
     .record(
       z.string().min(1).max(220),
       z.number().int().positive().max(10000000)
+    )
+    .default({}),
+  rateUnits: z
+    .record(
+      z.string().min(1).max(220),
+      z.enum(["generation", "image", "second"])
     )
     .default({}),
   modelMarkups: z.record(
@@ -81,6 +92,9 @@ export async function subscriptionPricingSettings() {
       credit_usd: z.coerce.number(),
       model_markups: z.record(z.string(), z.coerce.number()),
       fixed_credits: z.record(z.string(), z.number()),
+      rate_units: z
+        .record(z.string(), z.enum(["generation", "image", "second"]))
+        .optional(),
     })
     .parse(await rpc("brix_subscription_pricing"))
   return {
@@ -89,6 +103,7 @@ export async function subscriptionPricingSettings() {
     creditUsd: row.credit_usd,
     modelMarkups: row.model_markups,
     fixedCredits: row.fixed_credits,
+    rateUnits: row.rate_units ?? {},
   }
 }
 export async function saveSubscriptionPricingSettings(raw: unknown) {
@@ -100,36 +115,41 @@ export async function saveSubscriptionPricingSettings(raw: unknown) {
 export async function quoteSubscriptionCost(
   userId: string,
   modelId: string,
-  providerUsd: number | null
+  providerUsd: number | null,
+  requestBody: Record<string, unknown> = {}
 ) {
   z.uuid().parse(userId)
   z.string().min(1).parse(modelId)
   if (providerUsd !== null) z.number().finite().nonnegative().parse(providerUsd)
   const p = await subscriptionPricingSettings()
-  if (p.fixedCredits[modelId] || providerUsd === null) {
-    const credits = p.fixedCredits[modelId]
-    if (!credits)
-      throw new UserFacingError(
-        "This model needs an admin credit price before use.",
-        "PRICE_UNAVAILABLE"
-      )
-    return {
-      credits,
-      usd: credits * p.creditUsd,
-      priceVersion: p.version,
-      modelId,
-      providerUsd,
-    }
+  const rate = p.fixedCredits[modelId]
+  if (!rate)
+    throw new UserFacingError(
+      "The studio owner must set a customer price for this model in Admin.",
+      "PRICE_UNAVAILABLE"
+    )
+  const unit = p.rateUnits[modelId] ?? "generation"
+  let quantity: number
+  try {
+    quantity = subscriptionRateQuantity(unit, requestBody)
+  } catch (error) {
+    throw new UserFacingError(
+      error instanceof Error ? error.message : "Check the model quantity.",
+      "PRICE_UNAVAILABLE"
+    )
   }
-  const usd =
-    providerUsd * (1 + (p.modelMarkups[modelId] ?? p.markupPercent) / 100)
-  const credits = Math.max(
-    1,
-    Math.ceil(Number((usd / p.creditUsd).toPrecision(14)))
-  )
-  if (!Number.isSafeInteger(credits))
+  const credits = subscriptionRateCredits(rate, quantity)
+  if (!Number.isSafeInteger(credits) || credits <= 0)
     throw new UserFacingError("This request is too large to price.")
-  return { credits, usd, priceVersion: p.version, modelId, providerUsd }
+  return {
+    credits,
+    usd: credits * p.creditUsd,
+    priceVersion: p.version,
+    modelId,
+    providerUsd,
+    unit,
+    quantity,
+  }
 }
 export async function startSubscriptionGeneration(
   userId: string,
@@ -437,4 +457,12 @@ export async function subscriptionBillingReviews() {
   return z
     .array(z.object({ userId: z.uuid(), review: z.string() }))
     .parse(await rpc("brix_subscription_billing_reviews"))
+}
+
+export async function manualModelPricingReady() {
+  try {
+    return (await rpc("brix_manual_pricing_ready")) === true
+  } catch {
+    return false
+  }
 }

@@ -141,6 +141,59 @@ beforeEach(() => {
 afterAll(() => vi.unstubAllEnvs())
 
 describe("live generation ownership and schema checks", () => {
+  it("rejects undeclared quantity overrides even when extra API fields are allowed", async () => {
+    mocks.model.mockResolvedValueOnce({
+      ...definition,
+      id: "hf:higgsfield/genjutsu-light/motion-transfer/v1.0",
+      path: "higgsfield/genjutsu-light/motion-transfer/v1.0",
+      inputSchema: { ...definition.inputSchema, additionalProperties: true },
+    })
+    await expect(
+      prepareLiveUserGeneration(
+        "owner",
+        input({ prompt: "Transfer motion", duration: 1 })
+      )
+    ).rejects.toThrow("does not define")
+    expect(mocks.info).not.toHaveBeenCalled()
+  })
+
+  it("rejects dangling native Kling references before reading private files", async () => {
+    mocks.model.mockResolvedValueOnce({
+      ...definition,
+      id: "hf:kling-video/v4.0/reference-to-video",
+      path: "kling-video/v4.0/reference-to-video",
+    })
+    await expect(
+      prepareLiveUserGeneration(
+        "owner",
+        input({ prompt: "Animate @image_2 with @video_1", image_urls: [] })
+      )
+    ).rejects.toThrow("reference")
+    expect(mocks.info).not.toHaveBeenCalled()
+    expect(mocks.sign).not.toHaveBeenCalled()
+  })
+
+  it("preserves a valid native Kling mention while renewing its owned reference", async () => {
+    mocks.model.mockResolvedValueOnce({
+      ...definition,
+      id: "hf:kling-video/v4.0/reference-to-video",
+      path: "kling-video/v4.0/reference-to-video",
+    })
+    const result = await prepareLiveUserGeneration(
+      "owner",
+      input({
+        prompt: "Animate @image_1",
+        image_urls: [
+          "https://studio.example.test/api/media/owner/uploads/image.png",
+        ],
+      })
+    )
+    expect(result.request.body.prompt).toBe("Animate @image_1")
+    expect(result.request.body.image_urls).toEqual([
+      expect.stringContaining("token=fresh"),
+    ])
+  })
+
   it("rejects missing and stale schemas before accessing private storage", async () => {
     mocks.model.mockResolvedValueOnce(null)
     await expect(

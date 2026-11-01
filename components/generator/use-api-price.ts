@@ -64,6 +64,11 @@ export function useApiPrice(
             key,
             status: data.status === "ready" ? "ready" : "variable",
             usd: data.status === "ready" ? data.usd : null,
+            allowUsagePrice: data.allowUsagePrice === true,
+            priceFingerprint:
+              typeof data.priceFingerprint === "string"
+                ? data.priceFingerprint
+                : undefined,
             credits:
               typeof data.credits === "number" ? data.credits : undefined,
             estimated: data.estimated === true,
