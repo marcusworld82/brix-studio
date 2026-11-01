@@ -1,12 +1,22 @@
 # Unified studio and manual model pricing
 
-Marcus's November 1 correction supersedes the older split between the guided
-picker and the live model workspace.
+Marcus's November 1 Loom corrections supersede the older split between the
+guided picker and the live model workspace. The later recording
+`8abd05569b81448081c092aa62904e22` refines the layout by surface.
 
 ## Studio contract
 
-- Image and Video each have one workspace. Use the existing BRIX starter canvas
-  and bottom composer. Do not add a guided/live mode switch or a side composer.
+- Image and Video each have one workspace. Keep the existing BRIX starter canvas.
+  Video uses a left control panel on desktop, with inputs and model settings in
+  that panel. Image uses a bottom composer with compact inline parameter controls.
+  Do not add a guided/live mode switch or a separate model-settings dialog.
+- On narrow phones, video controls must remain full-width and reachable without
+  horizontal page overflow. Advanced inputs can expand within their control area;
+  ordinary dropdowns and the model/media pickers are not settings-window substitutes.
+- Custom Kling 3 shot cards use the API's real prompt and duration fields. BRIX
+  requires their lengths to match the duration being priced, so per-second quotes
+  cannot represent a different timeline. This is an app price-consistency rule,
+  informed by Kling's native contract; HF does not repeat the cross-field rule.
 - The public provider catalog supplies every available API operation to the
   appropriate picker. An operation is not the same as a model family.
 - Refresh model definitions on selection. Derive settings, required fields,

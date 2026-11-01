@@ -10,7 +10,6 @@ import {
   ImageIcon,
   Film,
   X,
-  SlidersHorizontal,
   ChevronDown,
   Search,
   FolderClosed,
@@ -48,6 +47,14 @@ import { HowItWorks } from "./canvas"
 import { PromptBox } from "@/components/studio/prompt-box"
 import { LiveReferencePrompt } from "./live-reference-prompt"
 import { referenceIdentity } from "./reference-identity"
+import { familyCover } from "@/lib/showcase"
+import {
+  liveFieldDisplay,
+  orderLiveFields,
+  visibleFieldErrors,
+} from "./live-field-display"
+import { videoWorkflow, workflowModel } from "./video-workflow"
+import { validateLiveShotTimeline } from "@/generation/catalog/shot-timeline"
 import {
   effectiveLiveSchema,
   liveMediaFields,
@@ -57,6 +64,7 @@ import {
   LIVE_REFERENCE_APP_LIMIT,
   remapLiveMentionTokens,
   validateNativeMentions,
+  liveMentionToken,
 } from "@/generation/catalog/media-constraints"
 import {
   Dialog,
@@ -105,7 +113,7 @@ export function LiveStudio({ surface }: { surface: Surface }) {
     )
     observer.observe(dockRef.current)
     return () => observer.disconnect()
-  }, [])
+  }, [surface])
   const runs = useRuns({ surface, enabled: !!user })
   const uploadState = useUploads()
   const loadUploads = uploadState.load
@@ -222,6 +230,7 @@ export function LiveStudio({ surface }: { surface: Surface }) {
   const mediaProblems = mediaFields.flatMap((field) => {
     const count = readLiveMediaUrls(field, values[field.key]).length
     return count < field.minItems &&
+      values[field.key] !== null &&
       (field.required || values[field.key] !== undefined)
       ? [
           `${field.name} requires at least ${field.minItems} ${field.kind} files.`,
@@ -234,13 +243,20 @@ export function LiveStudio({ surface }: { surface: Surface }) {
   })
   if (totalReferences > LIVE_REFERENCE_APP_LIMIT)
     mediaProblems.push("The studio allows at most 60 references in total.")
-  if (current) mediaProblems.push(...validateNativeMentions(current, values))
+  if (current)
+    mediaProblems.push(
+      ...validateNativeMentions(current, values),
+      ...validateLiveShotTimeline(current, values)
+    )
   const properties = record(effectiveSchema.properties)
     ? effectiveSchema.properties
     : {}
   const required = Array.isArray(effectiveSchema.required)
     ? (effectiveSchema.required as string[])
     : []
+  const relevantInvalid = current
+    ? visibleFieldErrors(current, values, properties, invalid)
+    : invalid
   const input = current
     ? {
         modelId: current.id,
@@ -261,7 +277,7 @@ export function LiveStudio({ surface }: { surface: Surface }) {
       !!connected &&
       !!current &&
       !current.stale &&
-      !Object.keys(invalid).length &&
+      !Object.keys(relevantInvalid).length &&
       !mediaProblems.length,
     user?.apiConnectionVersion
   )
@@ -283,14 +299,43 @@ export function LiveStudio({ surface }: { surface: Surface }) {
       .toLowerCase()
       .includes(search.toLowerCase())
   )
-  const ordered = Object.entries(properties).sort(([a], [b]) =>
-    a === "prompt" ? -1 : b === "prompt" ? 1 : 0
-  )
+  const ordered = current
+    ? orderLiveFields(current, properties).filter(
+        ([key, raw]) =>
+          !record(raw) || !liveFieldDisplay(current, key, raw, values).hidden
+      )
+    : []
+  const visibleMediaFields = mediaFields
+    .filter(
+      (field) =>
+        current &&
+        !liveFieldDisplay(current, field.key, field.raw, values).hidden
+    )
+    .map((field) => ({
+      ...field,
+      name: liveFieldDisplay(current!, field.key, field.raw, values).label,
+    }))
   const library = [
     ...uploadState.uploads.map(uploadToLibraryItem),
     ...runs.records.flatMap(runToLibraryItems),
   ]
-  const patch = (key: string, value: unknown, promptOverride?: string) =>
+  const patch = (key: string, value: unknown, promptOverride?: string) => {
+    if (current) {
+      const prospective = { ...values, [key]: value }
+      const nextSchema = effectiveLiveSchema(current, prospective)
+      const nextProperties = record(nextSchema.properties)
+        ? nextSchema.properties
+        : {}
+      setInvalid((old) => {
+        const next = visibleFieldErrors(
+          current,
+          prospective,
+          nextProperties,
+          old
+        )
+        return Object.keys(next).length === Object.keys(old).length ? old : next
+      })
+    }
     setValues((old) => {
       const next = { ...old }
       const field = mediaFields.find((candidate) => candidate.key === key)
@@ -305,8 +350,15 @@ export function LiveStudio({ surface }: { surface: Surface }) {
           )
       if (value === undefined) delete next[key]
       else next[key] = value
+      if (
+        key === "multi_prompt" &&
+        record(properties.multi_shots) &&
+        properties.multi_shots.type === "boolean"
+      )
+        next.multi_shots = Array.isArray(value) && value.length > 0
       return next
     })
+  }
   const fieldError = (key: string, message: string) =>
     setInvalid((old) => {
       const next = { ...old }
@@ -349,7 +401,7 @@ export function LiveStudio({ surface }: { surface: Surface }) {
       !current ||
       !quoteReady ||
       submitting ||
-      Object.keys(invalid).length ||
+      Object.keys(relevantInvalid).length ||
       mediaProblems.length
     )
       return
@@ -381,12 +433,17 @@ export function LiveStudio({ surface }: { surface: Surface }) {
           ? "Usage pricing"
           : "Price pending"
   const canvasView = canvasChoice ?? (items.length ? "history" : "how")
-  const renderField = ([key, raw]: [string, unknown]) =>
+  const renderField = ([key, raw]: [string, unknown], compact = false) =>
     record(raw) ? (
       <LiveField
         key={`${current?.id}:${formRevision}:${key}`}
         name={key}
-        schema={raw}
+        schema={{
+          ...raw,
+          title: current
+            ? liveFieldDisplay(current, key, raw, values).label
+            : raw.title,
+        }}
         required={required.includes(key)}
         value={values[key]}
         onChange={(value) => {
@@ -403,301 +460,478 @@ export function LiveStudio({ surface }: { surface: Surface }) {
         signedIn={!!user}
         mediaField={mediaFields.find((field) => field.key === key)}
         totalReferences={totalReferences}
+        compact={compact}
+        onSignIn={() => openAuth({ mode: "signup" })}
+        shotTotal={
+          current?.path.startsWith("kling-video/v3.0/") &&
+          typeof values.duration === "number"
+            ? values.duration
+            : undefined
+        }
       />
     ) : null
   const settings = ordered.filter(([key]) => key !== "prompt")
-  return (
-    <div className="relative flex min-h-0 min-w-0 flex-1 flex-col p-2 md:p-4 md:pt-2">
-      <section
-        className="studio-backdrop relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-[20px] border border-white/10"
-        aria-label="Results"
-      >
-        <div className="flex min-h-12 shrink-0 items-center justify-between gap-2 px-3">
-          <div
-            role="tablist"
-            aria-label="Canvas view"
-            className="flex items-center gap-1"
-          >
-            {(
-              [
-                ["history", "History", FolderClosed],
-                ["how", "How it works", BookOpen],
-              ] as const
-            ).map(([view, label, Icon]) => (
+  const mediaSettings = settings.filter(([key]) =>
+    mediaFields.some((field) => field.key === key)
+  )
+  const parameterSettings = settings.filter(
+    ([key]) => !mediaFields.some((field) => field.key === key)
+  )
+  const primaryKeys =
+    /^(aspect_ratio|aspectRatio|resolution|quality|size|n|num_images|num_outputs|batch_size|batchSize|output_format|enhance_prompt|generate_audio|audio)$/i
+  const primarySettings = parameterSettings.filter(
+    ([key, raw]) =>
+      primaryKeys.test(key) ||
+      (required.includes(key) &&
+        record(raw) &&
+        ["number", "integer", "boolean"].includes(String(raw.type)))
+  )
+  const advancedSettings = parameterSettings.filter(
+    (field) => !primarySettings.includes(field)
+  )
+  const modelPicker = (
+    <Dialog open={modelPickerOpen} onOpenChange={setModelPickerOpen}>
+      <DialogTrigger
+        render={
+          surface === "video" ? (
+            <button
+              type="button"
+              aria-label={`Model: ${current?.label ?? "Choose a model"}`}
+              className="relative h-20 w-full shrink-0 overflow-hidden rounded-xl bg-surface text-left"
+            >
+              {current && (
+                <Image
+                  unoptimized
+                  fill
+                  sizes="320px"
+                  src={
+                    current.previewImage ?? familyCover(current.family, surface)
+                  }
+                  alt=""
+                  className="object-cover"
+                />
+              )}
+              <span className="absolute inset-x-0 bottom-0 flex items-center gap-2 bg-black/75 px-3 py-2 text-xs font-medium">
+                <span className="min-w-0 flex-1 truncate">
+                  {current?.label ?? "Choose a model"}
+                </span>
+                <ChevronDown className="size-4 shrink-0" />
+              </span>
+            </button>
+          ) : (
+            <PromptBox.Pill
+              aria-label={`Model: ${current?.label ?? "Choose a model"}`}
+              start={surface === "image" ? <ImageIcon /> : <Film />}
+              end={<ChevronDown />}
+              className="max-w-[min(270px,65vw)]"
+            >
+              <span className="truncate">
+                {current?.label ?? "Choose a model"}
+              </span>
+            </PromptBox.Pill>
+          )
+        }
+      />
+      <DialogContent size="xl">
+        <DialogHeader>
+          <DialogTitle>
+            Choose {surface === "image" ? "an image" : "a video"} model
+          </DialogTitle>
+          <DialogDescription>
+            All currently discovered compatible API modes. Settings follow the
+            selected model.
+          </DialogDescription>
+        </DialogHeader>
+        <label className="flex items-center gap-2 rounded-xl border border-white/10 px-3">
+          <Search className="size-4 text-white/50" />
+          <input
+            className="min-h-11 w-full min-w-0 bg-transparent text-sm outline-none"
+            aria-label="Find a model"
+            placeholder="Search name, family or provider"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </label>
+        <DialogBody>
+          <div className="grid max-h-[55dvh] gap-2 overflow-y-auto sm:grid-cols-2">
+            {visible.map((model) => (
               <button
+                key={model.id}
                 type="button"
-                key={view}
-                role="tab"
-                aria-selected={canvasView === view}
-                onClick={() => setCanvasChoice(view)}
-                className={`flex min-h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs ${canvasView === view ? "bg-white/[0.08] text-white" : "text-white/50"}`}
+                aria-pressed={selected === model.id}
+                onClick={() => {
+                  setSelected(model.id)
+                  setError("")
+                  setSearch("")
+                  setModelPickerOpen(false)
+                }}
+                className={`min-w-0 rounded-xl border p-3 text-left ${selected === model.id ? "border-lime bg-lime/10" : "border-white/10 bg-white/[.03] hover:bg-white/[.07]"}`}
               >
-                <Icon className="size-3.5" />
-                {label}
+                <span className="block text-sm font-medium">{model.label}</span>
+                <span className="mt-1 block text-xs text-white/50">
+                  {model.id.startsWith("or:") ? "OpenRouter" : "Higgsfield"} ·{" "}
+                  {model.family}
+                </span>
               </button>
             ))}
+            {!visible.length && (
+              <p className="p-4 text-sm text-white/50">
+                No models match this search.
+              </p>
+            )}
           </div>
-          <button
-            type="button"
-            onClick={() => void load()}
-            className="flex min-h-9 items-center gap-1.5 rounded-lg px-2 text-xs text-white/50 hover:text-white"
-            aria-label="Refresh model catalog"
-          >
-            <RefreshCw className="size-3.5" />
-            <span className="hidden sm:inline">{models.length} models</span>
-          </button>
-        </div>
-        <div
-          className="flex min-h-0 flex-1 flex-col overflow-y-auto"
-          style={{ paddingBottom: dockHeight + 16 }}
+        </DialogBody>
+      </DialogContent>
+    </Dialog>
+  )
+  const promptControl = current ? (
+    <LiveReferencePrompt
+      key={`prompt:${current.id}`}
+      showAttached={false}
+      rows={surface === "video" ? 3 : 2}
+      pickerInline={surface === "video"}
+      fields={visibleMediaFields}
+      values={values}
+      prompt={typeof values.prompt === "string" ? values.prompt : ""}
+      onPromptChange={(value) => patch("prompt", value)}
+      onFieldChange={patch}
+      library={library}
+      signedIn={!!user}
+      onSignIn={() => openAuth({ mode: "signup" })}
+      maxLength={
+        record(properties.prompt) &&
+        typeof properties.prompt.maxLength === "number"
+          ? properties.prompt.maxLength
+          : undefined
+      }
+      onGenerate={() => void generate()}
+    />
+  ) : (
+    <p className="flex items-center gap-2 p-3 text-sm text-white/50">
+      <Loader2 className="size-4 animate-spin" />
+      Loading model inputs…
+    </p>
+  )
+  const generateControl = (
+    <PromptBox.Generate
+      cost={user && connected ? priceLabel : undefined}
+      disabled={
+        !!user &&
+        connected &&
+        (!quoteReady ||
+          submitting ||
+          !current ||
+          current.stale ||
+          !!Object.keys(relevantInvalid).length ||
+          !!mediaProblems.length ||
+          !!review)
+      }
+      onClick={() => {
+        if (!user) openAuth({ mode: "signup" })
+        else if (!connected) router.push("/account")
+        else void generate()
+      }}
+    >
+      {!user
+        ? "Sign in"
+        : !connected
+          ? "Connect key"
+          : submitting
+            ? "Submitting…"
+            : "Generate"}
+    </PromptBox.Generate>
+  )
+  const feedback = (
+    <>
+      {price.status === "variable" && price.allowUsagePrice && (
+        <label className="mx-3 flex items-start gap-2 rounded-lg bg-page px-3 py-2 text-xs text-white/70">
+          <input
+            type="checkbox"
+            className="mt-0.5 accent-lime"
+            checked={usageAccepted}
+            onChange={(event) =>
+              setAcceptedUsageFor(event.target.checked ? usageKey : "")
+            }
+          />
+          I accept usage-based billing from my OpenRouter account. The exact
+          total is reported after generation.
+        </label>
+      )}
+      {!!mediaProblems.length && (
+        <p
+          className="mx-3 mt-1 rounded-lg bg-page px-3 py-2 text-xs text-amber-200"
+          role="status"
         >
-          {canvasView === "how" ? (
-            <HowItWorks surface={surface} tab="create" />
-          ) : (
-            <div className="flex min-h-0 flex-1 flex-col px-3">
-              <UserGenerations
-                items={items}
-                title={<span className="text-sm">Your generations</span>}
-                actions={(item) =>
-                  actions(item).filter((action) => action.id !== "template")
-                }
-                hasMore={runs.hasMore}
-                loadingMore={runs.loadingMore}
-                onLoadMore={runs.loadMore}
-                emptyState={<HowItWorks surface={surface} tab="create" />}
-              />
-            </div>
-          )}
+          {mediaProblems.join(" ")}
+        </p>
+      )}
+      {(price.error || price.explanation) && (
+        <p
+          className="mx-3 mt-1 text-center text-[11px] text-white/50"
+          role="status"
+        >
+          {price.error || price.explanation}
+        </p>
+      )}
+    </>
+  )
+  const alerts = (
+    <>
+      {(error || runs.error || review || current?.stale || catalog?.stale) && (
+        <div
+          className="mx-3 mb-2 max-h-24 overflow-y-auto rounded-xl border border-white/10 bg-page px-3 py-2 text-xs text-amber-200"
+          role="status"
+        >
+          {error ||
+            runs.error ||
+            (review
+              ? "An earlier request needs provider review. Check its usage before retrying."
+              : current?.stale
+                ? "Refresh the model schema before generating."
+                : "Showing saved catalog data while the provider refreshes.")}
         </div>
-      </section>
+      )}
+    </>
+  )
+  const canvas = (
+    <section
+      className={`studio-backdrop relative flex min-w-0 flex-1 flex-col overflow-hidden rounded-[20px] border border-white/10 ${surface === "video" ? "min-h-[420px] shrink-0 md:min-h-0 md:shrink" : "min-h-0"}`}
+      aria-label="Results"
+    >
+      <div className="flex min-h-12 shrink-0 items-center justify-between gap-2 px-3">
+        <div
+          role="tablist"
+          aria-label="Canvas view"
+          className="flex items-center gap-1"
+        >
+          {(
+            [
+              ["history", "History", FolderClosed],
+              ["how", "How it works", BookOpen],
+            ] as const
+          ).map(([view, label, Icon]) => (
+            <button
+              type="button"
+              key={view}
+              role="tab"
+              aria-selected={canvasView === view}
+              onClick={() => setCanvasChoice(view)}
+              className={`flex min-h-9 items-center gap-1.5 rounded-lg px-2.5 text-xs ${canvasView === view ? "bg-white/[0.08] text-white" : "text-white/50"}`}
+            >
+              <Icon className="size-3.5" />
+              {label}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => void load()}
+          className="flex min-h-9 items-center gap-1.5 rounded-lg px-2 text-xs text-white/50 hover:text-white"
+          aria-label="Refresh model catalog"
+        >
+          <RefreshCw className="size-3.5" />
+          <span className="hidden sm:inline">{models.length} models</span>
+        </button>
+      </div>
+      <div
+        className="flex min-h-0 flex-1 flex-col overflow-y-auto"
+        style={{ paddingBottom: surface === "video" ? 16 : dockHeight + 16 }}
+      >
+        {canvasView === "how" ? (
+          <HowItWorks surface={surface} tab="create" />
+        ) : (
+          <div className="flex min-h-0 flex-1 flex-col px-3">
+            <UserGenerations
+              items={items}
+              title={<span className="text-sm">Your generations</span>}
+              actions={(item) =>
+                actions(item).filter((action) => action.id !== "template")
+              }
+              hasMore={runs.hasMore}
+              loadingMore={runs.loadingMore}
+              onLoadMore={runs.loadMore}
+              emptyState={<HowItWorks surface={surface} tab="create" />}
+            />
+          </div>
+        )}
+      </div>
+    </section>
+  )
+  return surface === "video" ? (
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 overflow-x-hidden overflow-y-auto p-2 md:flex-row md:gap-4 md:overflow-hidden md:p-4 md:pt-2">
+      <aside
+        className="studio-backdrop flex w-full min-w-0 shrink-0 flex-col overflow-hidden rounded-2xl border border-white/10 md:w-[320px]"
+        aria-label="Video generation controls"
+      >
+        <div
+          className="flex shrink-0 gap-1 border-b border-white/10 p-2"
+          role="group"
+          aria-label="Video workflow"
+        >
+          {(
+            [
+              ["create", "Create Video"],
+              ["edit", "Edit Video"],
+              ["motion", "Motion Control"],
+            ] as const
+          ).map(([workflow, label]) => (
+            <button
+              type="button"
+              key={workflow}
+              disabled={!workflowModel(models, workflow, current?.family)}
+              aria-pressed={
+                !!current && videoWorkflow(current.path) === workflow
+              }
+              onClick={() => {
+                const model = workflowModel(models, workflow, current?.family)
+                if (model && model.id !== selected) {
+                  setSelected(model.id)
+                  setError("")
+                }
+              }}
+              className={`min-h-9 min-w-0 flex-1 rounded-lg px-1 text-[11px] disabled:opacity-30 ${current && videoWorkflow(current.path) === workflow ? "bg-white/10 text-white" : "text-white/50 hover:text-white"}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <div className="flex min-h-8 shrink-0 items-center border-b border-white/10 px-4">
+          <h1 className="text-sm font-semibold">
+            {current && videoWorkflow(current.path) === "edit"
+              ? "Edit video"
+              : current && videoWorkflow(current.path) === "motion"
+                ? "Motion control"
+                : "Video studio"}
+          </h1>
+          <span className="ml-auto text-[11px] text-white/40">
+            {models.length} models
+          </span>
+        </div>
+        <div className="flex flex-col gap-3 p-3 md:min-h-0 md:flex-1 md:overflow-y-auto">
+          {modelPicker}
+          {!!mediaSettings.length && (
+            <section
+              className="grid grid-cols-2 gap-3"
+              aria-label="Video reference inputs"
+            >
+              {mediaSettings.map((field) => (
+                <div
+                  key={field[0]}
+                  className={
+                    mediaFields.find((media) => media.key === field[0])
+                      ?.array ||
+                    mediaFields.find((media) => media.key === field[0])
+                      ?.kind !== "image"
+                      ? "col-span-2 min-w-0"
+                      : "min-w-0"
+                  }
+                >
+                  {renderField(field, true)}
+                </div>
+              ))}
+            </section>
+          )}
+          <section
+            className="rounded-xl border border-white/10 bg-white/[.03] p-2"
+            aria-label="Video prompt"
+          >
+            <h2 className="mb-2 text-xs text-white/60">Prompt</h2>
+            {promptControl}
+          </section>
+          <section
+            className="grid grid-cols-2 items-start gap-3"
+            aria-label="Video model parameters"
+          >
+            {parameterSettings
+              .filter(
+                ([key]) =>
+                  key !== "multi_prompt" ||
+                  values.multi_shots !== false ||
+                  (Array.isArray(values.multi_prompt) &&
+                    values.multi_prompt.length > 0)
+              )
+              .map((field) => (
+                <div
+                  className={
+                    record(field[1]) &&
+                    (["object", "array"].includes(String(field[1].type)) ||
+                      field[0].includes("prompt"))
+                      ? "col-span-2 min-w-0"
+                      : "min-w-0"
+                  }
+                  key={field[0]}
+                >
+                  {renderField(field, true)}
+                </div>
+              ))}
+          </section>
+          {alerts}
+        </div>
+        <div className="sticky bottom-0 z-10 shrink-0 border-t border-white/10 bg-page p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] [&_.q-prompt-box-generate]:h-12 [&_.q-prompt-box-generate]:min-h-12 [&_.q-prompt-box-generate]:w-full [&_.q-prompt-box-generate]:flex-row [&_.q-prompt-box-generate]:gap-3 [&_.q-prompt-box-generate]:p-3">
+          {generateControl}
+          {feedback}
+        </div>
+      </aside>
+      {canvas}
+      {dialogs}
+    </div>
+  ) : (
+    <div className="relative flex min-h-0 min-w-0 flex-1 flex-col p-2 md:p-4 md:pt-2">
+      {canvas}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center px-3 pb-3 md:px-6 md:pb-6">
         <div
           ref={dockRef}
           className="pointer-events-auto w-full max-w-[1120px]"
         >
-          {(error ||
-            runs.error ||
-            review ||
-            current?.stale ||
-            catalog?.stale) && (
-            <div
-              className="mx-3 mb-2 max-h-24 overflow-y-auto rounded-xl border border-white/10 bg-page px-3 py-2 text-xs text-amber-200"
-              role="status"
-            >
-              {error ||
-                runs.error ||
-                (review
-                  ? "An earlier request needs provider review. Check its usage before retrying."
-                  : current?.stale
-                    ? "Refresh the model schema before generating."
-                    : "Showing saved catalog data while the provider refreshes.")}
-            </div>
-          )}
+          {alerts}
           <PromptBox.Root
             surface="glass"
             className="w-full"
-            aria-label={`${surface === "image" ? "Image" : "Video"} generation controls`}
+            aria-label="Image generation controls"
           >
             <PromptBox.Body>
-              {current ? (
-                <LiveReferencePrompt
-                  key={current.id}
-                  fields={mediaFields}
-                  values={values}
-                  prompt={
-                    typeof values.prompt === "string" ? values.prompt : ""
-                  }
-                  onPromptChange={(value) => patch("prompt", value)}
-                  onFieldChange={patch}
-                  library={library}
-                  signedIn={!!user}
-                  onSignIn={() => openAuth({ mode: "signup" })}
-                  maxLength={
-                    record(properties.prompt) &&
-                    typeof properties.prompt.maxLength === "number"
-                      ? properties.prompt.maxLength
-                      : undefined
-                  }
-                  onGenerate={() => void generate()}
-                />
-              ) : (
-                <p className="flex items-center gap-2 p-3 text-sm text-white/50">
-                  <Loader2 className="size-4 animate-spin" />
-                  Loading model inputs…
-                </p>
-              )}
-              <PromptBox.Actions className="flex-wrap">
-                <Dialog
-                  open={modelPickerOpen}
-                  onOpenChange={setModelPickerOpen}
+              {!!mediaSettings.length && (
+                <section
+                  className="flex max-h-[20dvh] min-w-0 flex-wrap gap-3 overflow-y-auto"
+                  aria-label="Image reference inputs"
                 >
-                  <DialogTrigger
-                    render={
-                      <PromptBox.Pill
-                        aria-label={`Model: ${current?.label ?? "Choose a model"}`}
-                        start={surface === "image" ? <ImageIcon /> : <Film />}
-                        end={<ChevronDown />}
-                        className="max-w-[min(270px,65vw)]"
-                      >
-                        <span className="truncate">
-                          {current?.label ?? "Choose a model"}
-                        </span>
-                      </PromptBox.Pill>
-                    }
-                  />
-                  <DialogContent size="xl">
-                    <DialogHeader>
-                      <DialogTitle>
-                        Choose {surface === "image" ? "an image" : "a video"}{" "}
-                        model
-                      </DialogTitle>
-                      <DialogDescription>
-                        All currently discovered compatible API modes. Settings
-                        follow the selected model.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <label className="flex items-center gap-2 rounded-xl border border-white/10 px-3">
-                      <Search className="size-4 text-white/50" />
-                      <input
-                        className="min-h-11 w-full min-w-0 bg-transparent text-sm outline-none"
-                        aria-label="Find a model"
-                        placeholder="Search name, family or provider"
-                        value={search}
-                        onChange={(event) => setSearch(event.target.value)}
-                      />
-                    </label>
-                    <DialogBody>
-                      <div className="grid max-h-[55dvh] gap-2 overflow-y-auto sm:grid-cols-2">
-                        {visible.map((model) => (
-                          <button
-                            key={model.id}
-                            type="button"
-                            aria-pressed={selected === model.id}
-                            onClick={() => {
-                              setSelected(model.id)
-                              setError("")
-                              setSearch("")
-                              setModelPickerOpen(false)
-                            }}
-                            className={`min-w-0 rounded-xl border p-3 text-left ${selected === model.id ? "border-lime bg-lime/10" : "border-white/10 bg-white/[.03] hover:bg-white/[.07]"}`}
-                          >
-                            <span className="block text-sm font-medium">
-                              {model.label}
-                            </span>
-                            <span className="mt-1 block text-xs text-white/50">
-                              {model.id.startsWith("or:")
-                                ? "OpenRouter"
-                                : "Higgsfield"}{" "}
-                              · {model.family}
-                            </span>
-                          </button>
-                        ))}
-                        {!visible.length && (
-                          <p className="p-4 text-sm text-white/50">
-                            No models match this search.
-                          </p>
-                        )}
-                      </div>
-                    </DialogBody>
-                  </DialogContent>
-                </Dialog>
-                <Dialog>
-                  <DialogTrigger
-                    render={
-                      <PromptBox.Pill
-                        start={<SlidersHorizontal />}
-                        aria-label="Model settings"
-                        disabled={!current}
-                      >
-                        Settings
-                      </PromptBox.Pill>
-                    }
-                  />
-                  <DialogContent size="md">
-                    <DialogHeader>
-                      <DialogTitle>{current?.label} settings</DialogTitle>
-                      <DialogDescription>
-                        Inputs and limits come from this model&apos;s current
-                        schema.
-                      </DialogDescription>
-                    </DialogHeader>
-                    <DialogBody>
-                      <div className="grid max-h-[60dvh] gap-5 overflow-y-auto pr-1">
-                        {settings.map(renderField)}
-                        {!settings.length && (
-                          <p className="text-sm text-white/50">
-                            This model has no additional settings.
-                          </p>
-                        )}
-                      </div>
-                    </DialogBody>
-                  </DialogContent>
-                </Dialog>
-                <span className="ml-auto hidden text-[11px] text-white/40 sm:inline">
-                  {catalog
-                    ? `${models.length} models · ${catalog.stale ? "saved catalog" : "catalog updated"}`
-                    : "Loading catalog"}
-                </span>
+                  {mediaSettings.map((field) => (
+                    <div className="max-w-full min-w-0" key={field[0]}>
+                      {renderField(field, true)}
+                    </div>
+                  ))}
+                </section>
+              )}
+              {promptControl}
+              <PromptBox.Actions className="flex-wrap items-end">
+                {modelPicker}
+                {primarySettings.map((field) => (
+                  <div className="max-w-[170px] min-w-0" key={field[0]}>
+                    {renderField(field, true)}
+                  </div>
+                ))}
               </PromptBox.Actions>
+              {!!advancedSettings.length && (
+                <details
+                  key={`advanced:${current?.id}`}
+                  className="min-w-0 border-t border-white/5 pt-2"
+                >
+                  <summary className="w-fit cursor-pointer text-[11px] text-white/50">
+                    More controls ({advancedSettings.length})
+                  </summary>
+                  <div className="mt-2 flex max-h-[22dvh] flex-wrap items-start gap-3 overflow-y-auto">
+                    {advancedSettings.map((field) => (
+                      <div className="max-w-full min-w-0" key={field[0]}>
+                        {renderField(field, true)}
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
             </PromptBox.Body>
-            <PromptBox.Generate
-              cost={user && connected ? priceLabel : undefined}
-              disabled={
-                !!user &&
-                connected &&
-                (!quoteReady ||
-                  submitting ||
-                  !current ||
-                  current.stale ||
-                  !!Object.keys(invalid).length ||
-                  !!mediaProblems.length ||
-                  !!review)
-              }
-              onClick={() => {
-                if (!user) openAuth({ mode: "signup" })
-                else if (!connected) router.push("/account")
-                else void generate()
-              }}
-            >
-              {!user
-                ? "Sign in"
-                : !connected
-                  ? "Connect key"
-                  : submitting
-                    ? "Submitting…"
-                    : "Generate"}
-            </PromptBox.Generate>
+            {generateControl}
           </PromptBox.Root>
-          {price.status === "variable" && price.allowUsagePrice && (
-            <label className="mx-3 flex items-start gap-2 rounded-lg bg-page px-3 py-2 text-xs text-white/70">
-              <input
-                type="checkbox"
-                className="mt-0.5 accent-lime"
-                checked={usageAccepted}
-                onChange={(event) =>
-                  setAcceptedUsageFor(event.target.checked ? usageKey : "")
-                }
-              />
-              I accept usage-based billing from my OpenRouter account. The exact
-              total is reported after generation.
-            </label>
-          )}
-          {!!mediaProblems.length && (
-            <p
-              className="mx-3 mt-1 rounded-lg bg-page px-3 py-2 text-xs text-amber-200"
-              role="status"
-            >
-              {mediaProblems.join(" ")}
-            </p>
-          )}
-          {(price.error || price.explanation) && (
-            <p
-              className="mx-3 mt-1 text-center text-[11px] text-white/50"
-              role="status"
-            >
-              {price.error || price.explanation}
-            </p>
-          )}
+          {feedback}
         </div>
       </div>
       {dialogs}
@@ -716,6 +950,9 @@ function LiveField({
   signedIn,
   mediaField,
   totalReferences,
+  compact = false,
+  onSignIn,
+  shotTotal,
 }: {
   name: string
   schema: Json
@@ -727,7 +964,13 @@ function LiveField({
   signedIn: boolean
   mediaField?: LiveMediaField
   totalReferences: number
+  compact?: boolean
+  onSignIn: () => void
+  shotTotal?: number
 }) {
+  const inputClass = compact
+    ? "w-full min-w-0 rounded-lg bg-transparent px-1 py-1 text-xs text-white outline-none focus:ring-1 focus:ring-lime"
+    : fieldClass
   const label =
     typeof schema.title === "string" ? schema.title : name.replaceAll("_", " ")
   const type = Array.isArray(schema.type)
@@ -759,7 +1002,9 @@ function LiveField({
       name: `${label} ${index + 1}`,
     }))
     return (
-      <div className="flex min-w-0 flex-col gap-2">
+      <div
+        className={`flex min-w-0 flex-col gap-2 ${compact ? "max-w-full rounded-xl bg-white/[.03] p-2" : ""}`}
+      >
         <span className="text-xs text-white/70">
           {label}
           {required || mediaField?.required ? " *" : ""} · {urls.length}/
@@ -771,10 +1016,10 @@ function LiveField({
             references.
           </p>
         )}
-        <div className="flex flex-wrap gap-2">
+        <div className="flex max-w-full flex-wrap gap-2">
           {selections.map((item) => (
             <span
-              className="relative block size-24 overflow-hidden rounded-lg border border-white/10"
+              className={`relative block shrink-0 overflow-hidden rounded-lg border border-white/10 ${compact ? "size-16" : "size-24"}`}
               key={item.src}
             >
               {mediaKind === "video" ? (
@@ -792,6 +1037,37 @@ function LiveField({
                 <span className="flex size-full items-center justify-center text-xs">
                   Audio attached
                 </span>
+              )}
+              <span className="absolute bottom-0 left-0 rounded-tr bg-black/80 px-1 text-[10px] text-white/80">
+                {liveMentionToken(mediaField!, urls.indexOf(item.src)) ??
+                  urls.indexOf(item.src) + 1}
+              </span>
+              {isArray && urls.length > 1 && (
+                <div className="absolute right-0 bottom-0 flex bg-black/80">
+                  {([-1, 1] as const).map((direction) => (
+                    <button
+                      type="button"
+                      key={direction}
+                      className="flex size-7 items-center justify-center text-xs text-white disabled:opacity-30"
+                      disabled={
+                        urls.indexOf(item.src) + direction < 0 ||
+                        urls.indexOf(item.src) + direction >= urls.length
+                      }
+                      aria-label={`Move ${item.name} ${direction < 0 ? "earlier" : "later"}`}
+                      onClick={() => {
+                        const next = [...urls]
+                        const index = urls.indexOf(item.src)
+                        ;[next[index], next[index + direction]] = [
+                          next[index + direction],
+                          next[index],
+                        ]
+                        onChange(encodeLiveMediaUrls(mediaField!, next))
+                      }}
+                    >
+                      {direction < 0 ? "←" : "→"}
+                    </button>
+                  ))}
+                </div>
               )}
               <button
                 className="absolute top-1 right-1 rounded-full bg-black/80 p-1"
@@ -853,7 +1129,7 @@ function LiveField({
             trigger={
               <button
                 disabled={uploading || !remaining}
-                className={`${fieldClass} flex items-center justify-center gap-2`}
+                className={`${fieldClass} flex ${compact ? "min-h-12" : "min-h-20"} items-center justify-center gap-2 border-dashed`}
               >
                 {uploading ? (
                   <Loader2 className="size-4 animate-spin" />
@@ -865,16 +1141,22 @@ function LiveField({
             }
           />
         ) : (
-          <p className="text-xs text-white/40">
-            Sign in to attach a private file.
-          </p>
+          <button
+            type="button"
+            className={`${fieldClass} flex ${compact ? "min-h-12" : "min-h-20"} items-center justify-center gap-2 border-dashed text-white/60`}
+            onClick={onSignIn}
+          >
+            <Plus className="size-4" />
+            Add {mediaKind}
+            {isArray ? " references" : ""}
+          </button>
         )}
         {localError ? (
           <p className="text-xs text-red-300" role="alert">
             {localError}
           </p>
         ) : null}
-        {typeof schema.description === "string" ? (
+        {!compact && typeof schema.description === "string" ? (
           <p className="text-[11px] leading-relaxed text-white/40">
             {schema.description}
           </p>
@@ -882,9 +1164,38 @@ function LiveField({
       </div>
     )
   }
+  if (
+    type === "array" &&
+    record(schema.items) &&
+    record(schema.items.properties) &&
+    record(schema.items.properties.prompt) &&
+    record(schema.items.properties.duration)
+  )
+    return (
+      <ShotField
+        label={label}
+        schema={schema}
+        value={value}
+        onChange={onChange}
+        onError={onError}
+        totalDuration={shotTotal}
+      />
+    )
+  if (compact && type === "boolean")
+    return (
+      <label className="inline-flex min-h-10 items-center gap-2 rounded-xl bg-white/5 px-3 text-xs text-white/70">
+        <input
+          type="checkbox"
+          checked={value === true}
+          onChange={(event) => onChange(event.target.checked)}
+          className="size-4 accent-lime"
+        />
+        <span>{label}</span>
+      </label>
+    )
   const content = Array.isArray(schema.enum) ? (
     <select
-      className={fieldClass}
+      className={inputClass}
       value={
         typeof value === "string" || typeof value === "number"
           ? String(value)
@@ -916,9 +1227,20 @@ function LiveField({
     />
   ) : type === "integer" || type === "number" ? (
     <input
-      className={fieldClass}
+      className={inputClass}
       type="number"
-      step={type === "integer" ? 1 : "any"}
+      step={
+        typeof schema.multipleOf === "number"
+          ? schema.multipleOf
+          : type === "integer"
+            ? 1
+            : typeof schema.minimum === "number" &&
+                typeof schema.maximum === "number" &&
+                schema.minimum >= 0 &&
+                schema.maximum <= 1
+              ? 0.01
+              : "any"
+      }
       min={typeof schema.minimum === "number" ? schema.minimum : undefined}
       max={typeof schema.maximum === "number" ? schema.maximum : undefined}
       value={typeof value === "number" ? value : ""}
@@ -929,14 +1251,14 @@ function LiveField({
   ) : type === "string" ? (
     name === "prompt" || Number(schema.maxLength) > 500 ? (
       <textarea
-        className={`${fieldClass} min-h-28 resize-y`}
+        className={`${inputClass} min-h-24 resize-y`}
         value={typeof value === "string" ? value : ""}
         onChange={(e) => onChange(e.target.value)}
         placeholder={required ? "Required" : "Optional"}
       />
     ) : (
       <input
-        className={fieldClass}
+        className={inputClass}
         type="text"
         value={typeof value === "string" ? value : ""}
         onChange={(e) => onChange(e.target.value || undefined)}
@@ -947,13 +1269,18 @@ function LiveField({
     <JsonField value={value} onChange={onChange} onError={onError} />
   )
   return (
-    <label className="flex min-w-0 flex-col gap-1.5 text-xs text-white/70">
+    <label
+      title={
+        typeof schema.description === "string" ? schema.description : undefined
+      }
+      className={`flex min-w-0 flex-col text-white/70 ${compact ? "gap-0.5 rounded-xl bg-white/5 px-2 py-1 text-[11px]" : "gap-1.5 text-xs"}`}
+    >
       <span>
         {label}
         {required ? " *" : ""}
       </span>
       {content}
-      {typeof schema.description === "string" ? (
+      {!compact && typeof schema.description === "string" ? (
         <span className="text-[11px] leading-relaxed text-white/40">
           {schema.description}
         </span>
@@ -993,5 +1320,148 @@ function JsonField({
         }
       }}
     />
+  )
+}
+
+/** Native shot objects, with every bound read from the selected model schema. */
+function ShotField({
+  label,
+  schema,
+  value,
+  onChange,
+  onError,
+  totalDuration,
+}: {
+  label: string
+  schema: Json
+  value: unknown
+  onChange: (value: unknown) => void
+  onError: (value: string) => void
+  totalDuration?: number
+}) {
+  const items = record(schema.items) ? schema.items : {}
+  const properties = record(items.properties) ? items.properties : {}
+  const prompt = record(properties.prompt) ? properties.prompt : {}
+  const duration = record(properties.duration) ? properties.duration : {}
+  const shots = Array.isArray(value) ? value.filter(record) : []
+  const max = typeof schema.maxItems === "number" ? schema.maxItems : null
+  const minimum =
+    typeof duration.minimum === "number" ? duration.minimum : undefined
+  const maximum =
+    typeof duration.maximum === "number" ? duration.maximum : undefined
+  function commit(next: Json[]) {
+    const message = next.some(
+      (shot) =>
+        typeof shot.prompt !== "string" ||
+        !shot.prompt.trim() ||
+        (typeof prompt.maxLength === "number" &&
+          shot.prompt.length > prompt.maxLength) ||
+        typeof shot.duration !== "number" ||
+        !Number.isFinite(shot.duration) ||
+        (minimum !== undefined && shot.duration < minimum) ||
+        (maximum !== undefined && shot.duration > maximum)
+    )
+      ? "Give each shot a prompt and a duration within this model's limits."
+      : ""
+    onError(message)
+    onChange(next.length ? next : undefined)
+  }
+  return (
+    <fieldset className="min-w-0 space-y-3 rounded-xl border border-white/10 p-3">
+      <legend className="px-1 text-xs text-white/70">
+        {label}
+        {max !== null ? ` · ${shots.length}/${max} shots` : ""}
+      </legend>
+      {shots.map((shot, index) => (
+        <div
+          className="min-w-0 space-y-2 rounded-lg bg-black/20 p-2"
+          key={index}
+        >
+          <div className="flex items-center justify-between text-[11px] text-white/50">
+            <span>Shot {index + 1}</span>
+            <button
+              type="button"
+              className="min-h-7 px-1 text-white/60"
+              aria-label={`Remove shot ${index + 1}`}
+              onClick={() => commit(shots.filter((_, i) => i !== index))}
+            >
+              Remove
+            </button>
+          </div>
+          <label className="block text-[11px] text-white/60">
+            Shot {index + 1} prompt
+            <textarea
+              rows={2}
+              maxLength={
+                typeof prompt.maxLength === "number"
+                  ? prompt.maxLength
+                  : undefined
+              }
+              value={typeof shot.prompt === "string" ? shot.prompt : ""}
+              onChange={(event) =>
+                commit(
+                  shots.map((item, i) =>
+                    i === index ? { ...item, prompt: event.target.value } : item
+                  )
+                )
+              }
+              className={`${fieldClass} mt-1 resize-y`}
+            />
+          </label>
+          <label className="flex items-center justify-between gap-2 text-[11px] text-white/60">
+            Duration, seconds
+            <input
+              type="number"
+              min={minimum}
+              max={maximum}
+              step={duration.type === "integer" ? 1 : "any"}
+              value={typeof shot.duration === "number" ? shot.duration : ""}
+              onChange={(event) =>
+                commit(
+                  shots.map((item, i) =>
+                    i === index
+                      ? {
+                          ...item,
+                          duration:
+                            event.target.value === ""
+                              ? undefined
+                              : Number(event.target.value),
+                        }
+                      : item
+                  )
+                )
+              }
+              aria-label={`Shot ${index + 1} duration`}
+              className={`${fieldClass} max-w-24`}
+            />
+          </label>
+        </div>
+      ))}
+      <button
+        type="button"
+        className="flex min-h-9 items-center gap-2 rounded-lg bg-white/5 px-3 text-xs text-white/70 disabled:opacity-30"
+        disabled={max !== null && shots.length >= max}
+        onClick={() =>
+          commit([
+            ...shots,
+            {
+              prompt: "",
+              duration:
+                typeof duration.default === "number"
+                  ? duration.default
+                  : (minimum ?? 0),
+            },
+          ])
+        }
+      >
+        <Plus className="size-3" />
+        Add shot
+      </button>
+      <p className="text-[11px] leading-relaxed text-white/40">
+        {totalDuration !== undefined
+          ? `Shots: ${shots.reduce((sum, shot) => sum + (typeof shot.duration === "number" ? shot.duration : 0), 0)} of ${totalDuration} seconds. Shot lengths should add up to the selected duration.`
+          : `Shot lengths use this model's limits${minimum !== undefined && maximum !== undefined ? `: ${minimum}–${maximum} seconds each` : ""}.`}
+      </p>
+    </fieldset>
   )
 }

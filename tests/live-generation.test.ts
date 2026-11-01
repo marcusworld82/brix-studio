@@ -141,6 +141,63 @@ beforeEach(() => {
 afterAll(() => vi.unstubAllEnvs())
 
 describe("live generation ownership and schema checks", () => {
+  it("rejects a Kling shot timeline that disagrees with the priced duration", async () => {
+    mocks.model.mockResolvedValueOnce({
+      ...definition,
+      path: "kling-video/v3.0/std/text-to-video",
+      inputSchema: {
+        ...definition.inputSchema,
+        properties: {
+          ...(definition.inputSchema.properties as Record<string, unknown>),
+          duration: { type: "integer", minimum: 3, maximum: 15 },
+          multi_prompt: { type: "array", items: { type: "object" } },
+        },
+      },
+    })
+    await expect(
+      prepareLiveUserGeneration(
+        "owner",
+        input({
+          prompt: "Two shots",
+          duration: 3,
+          multi_prompt: [
+            { prompt: "Wide shot", duration: 5 },
+            { prompt: "Close-up", duration: 5 },
+          ],
+        })
+      )
+    ).rejects.toThrow("shot lengths")
+    expect(mocks.info).not.toHaveBeenCalled()
+  })
+
+  it("preserves a Kling shot timeline that matches the priced duration", async () => {
+    mocks.model.mockResolvedValueOnce({
+      ...definition,
+      path: "kling-video/v3.0/pro/image-to-video",
+      inputSchema: {
+        ...definition.inputSchema,
+        properties: {
+          ...(definition.inputSchema.properties as Record<string, unknown>),
+          duration: { type: "integer", minimum: 3, maximum: 15 },
+          multi_prompt: { type: "array", items: { type: "object" } },
+        },
+      },
+    })
+    const result = await prepareLiveUserGeneration(
+      "owner",
+      input({
+        prompt: "Two shots",
+        duration: 7,
+        multi_prompt: [
+          { prompt: "Wide shot", duration: 3 },
+          { prompt: "Close-up", duration: 4 },
+        ],
+      })
+    )
+    expect(result.request.body.duration).toBe(7)
+    expect(result.request.body.multi_prompt).toHaveLength(2)
+  })
+
   it("rejects undeclared quantity overrides even when extra API fields are allowed", async () => {
     mocks.model.mockResolvedValueOnce({
       ...definition,

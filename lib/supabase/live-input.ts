@@ -1,6 +1,7 @@
 import "server-only"
 import { getProviderModel } from "@/lib/providers/catalog"
 import { validateLiveInput } from "@/generation/catalog/live-schema"
+import { validateLiveShotTimeline } from "@/generation/catalog/shot-timeline"
 import {
   effectiveLiveSchema,
   validateNativeMentions,
@@ -26,6 +27,8 @@ export async function prepareLiveUserGeneration(
   const parsed = validateLiveInput(definition, input.settings.providerInput)
   if (!parsed.data)
     throw new UserFacingError(parsed.errors.join(" ").slice(0, 1500))
+  const timelineErrors = validateLiveShotTimeline(definition, parsed.data)
+  if (timelineErrors.length) throw new UserFacingError(timelineErrors.join(" "))
   // Additional properties can be valid API extensions, but undeclared quantity
   // aliases must never turn into trusted billing inputs for a source-length job.
   const properties = effectiveLiveSchema(definition, parsed.data).properties

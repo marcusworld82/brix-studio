@@ -33,6 +33,9 @@ export function LiveReferencePrompt({
   onSignIn,
   maxLength,
   onGenerate,
+  showAttached = true,
+  rows = 1,
+  pickerInline = false,
 }: {
   fields: LiveMediaField[]
   values: Record<string, unknown>
@@ -44,6 +47,9 @@ export function LiveReferencePrompt({
   onSignIn: () => void
   maxLength?: number
   onGenerate: () => void
+  showAttached?: boolean
+  rows?: number
+  pickerInline?: boolean
 }) {
   const id = useId()
   const textRef = useRef<HTMLTextAreaElement>(null)
@@ -147,7 +153,7 @@ export function LiveReferencePrompt({
 
   return (
     <div className="relative min-w-0">
-      {!!attached.length && (
+      {showAttached && !!attached.length && (
         <div
           className="mb-2 flex max-w-full gap-2 overflow-x-auto py-1"
           aria-label="Attached model references"
@@ -199,6 +205,7 @@ export function LiveReferencePrompt({
       )}
       <PromptBox.Field
         ref={textRef}
+        rows={rows}
         aria-label="Prompt"
         aria-controls={open ? `${id}-options` : undefined}
         aria-activedescendant={
@@ -266,7 +273,7 @@ export function LiveReferencePrompt({
       />
       <button
         type="button"
-        className="absolute right-0 bottom-0 flex size-10 items-center justify-center rounded-xl bg-white/5 text-white/60 hover:text-white disabled:opacity-30"
+        className={`absolute right-0 ${pickerInline ? "top-0" : "bottom-0"} flex size-10 items-center justify-center rounded-xl bg-white/5 text-white/60 hover:text-white disabled:opacity-30`}
         disabled={!fields.length}
         title={
           fields.length
@@ -291,7 +298,7 @@ export function LiveReferencePrompt({
       )}
       {open && (
         <section
-          className="absolute right-0 bottom-full left-0 z-40 mb-2 max-h-[45dvh] overflow-y-auto rounded-2xl border border-white/15 bg-[#1b1e23] p-3 shadow-xl"
+          className={`${pickerInline ? "relative mt-2" : "absolute right-0 bottom-full left-0 z-40 mb-2"} max-h-[45dvh] overflow-y-auto rounded-2xl border border-white/15 bg-[#1b1e23] p-3 shadow-xl`}
           aria-label="Reference picker"
         >
           <div className="mb-2 flex items-center justify-between gap-2">
