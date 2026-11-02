@@ -98,6 +98,23 @@ export function ApiKeyForm({ label, next }: { label?: string; next?: string }) {
           Disconnect API key
         </button>
       ) : null}
+      <div className="space-y-3 border-t border-white/10 pt-5">
+        <h3 className="text-sm font-medium">Balance and top-ups</h3>
+        <p className="text-sm text-muted-foreground">
+          Sign in to your Higgsfield API account in this browser to check your
+          balance and add funds. Its login is separate from BRIX. Higgsfield may
+          ask you to sign in again when its session expires.
+        </p>
+        <a
+          href="https://open.higgsfield.ai/billing"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex min-h-11 items-center rounded-xl bg-white/5 px-4 text-sm font-medium hover:bg-white/10"
+          title="Opens Higgsfield Billing in a new tab. BRIX stays open."
+        >
+          Sign in and check balance
+        </a>
+      </div>
       {message ? (
         <p role="status" className="text-sm">
           {message}

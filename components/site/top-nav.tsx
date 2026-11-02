@@ -130,7 +130,7 @@ function AccountControls({ compact }: { compact: boolean }) {
           }
           title={
             user.apiKeyConnected
-              ? "View your API balance in Higgsfield Billing. A live wallet API is not available."
+              ? "Check your balance or add funds in Higgsfield Billing (opens in a new tab)."
               : undefined
           }
           target={user.apiKeyConnected ? "_blank" : undefined}
@@ -141,7 +141,7 @@ function AccountControls({ compact }: { compact: boolean }) {
           )}
         >
           {user.apiKeyConnected
-            ? "Balance unavailable"
+            ? "Check balance"
             : user.openRouterConnected
               ? "API accounts"
               : "Connect API key"}
